@@ -77,6 +77,12 @@ square_str_not = \
       'h8'
     ]
 
+def idx_to_row_col(idx):
+  return int(idx/8), idx % 8
+
+def row_col_to_idx(row,col):
+  return row*8 + col
+
 class Square :
 
   def as_int(self):
@@ -86,10 +92,13 @@ class Square :
     assert idx >= 0 and idx < 64
 
     self.idx = idx
+    self.row,self.col = idx_to_row_col(self.idx)
+
     self.idx_64 = square_idx_to_uin64t[self.idx]
 
   def as_uint64(self):
     return self.idx_64
+
 
   def __str__(self):
     return square_str_not[self.idx]

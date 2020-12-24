@@ -17,19 +17,29 @@
 
 #well start with this, seems hard enough. queering legal moves is later prio ( we want attack tables generated first )
 
+#future  :
+#board serializer : takes in a chessboard and outputs 12 tensors (for each piece type )
+#castling class, takes care of castling rights and check if possible in current state
+#repetion class, checks 50 move rule, threefold repetition
+#attack tables, caching all possible attacks with magic bitboard combinations
+#boardplay wrapper, a class that wraps logic so user can simply play a game without touching logic
+#for example, class with step taking a chess action input and outputs if game is over, next gameboard state and reward(reward is = 1 for winner etc.)
+#network preparation, pytorch net with agent
+#the memory and its algorithm, playing games will result in millions of positions, it will be too broad action space,
+#have to be limited , learn about monte carlo search tree to optimize the training data
+
 from chess_board import ChessBoard
 
 from test.square_test import run_square_tests
 from test.board_test import run_board_tests
+from test.attack_tables_test import run_attack_tables_test
+
+
 if __name__ == '__main__':
 
-
-    # example_fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-    # chessboard = ChessBoard(fen_position=example_fen)
-
-    run_square_tests()
-    run_board_tests()
-
+    #run_square_tests()
+    #run_board_tests()
+    run_attack_tables_test()
 
 
 

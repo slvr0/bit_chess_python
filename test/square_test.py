@@ -70,6 +70,44 @@ def run_square_tests():
   except:
     print('failed on test 11')
 
+  sq_5 = Square(0)
+
+  try:
+    IS_EQ(sq_5.row, 0)
+  except:
+    print('failed on test 12')
+
+  try:
+    IS_EQ(sq_5.col, 0)
+  except:
+    print('failed on test 13')
+
+  sq_6 = Square(37)
+
+  try:
+    IS_EQ(sq_6.row, 4)
+  except:
+    print('failed on test 14')
+
+  try:
+    IS_EQ(sq_6.col, 5)
+  except:
+    print('failed on test 15, input: {}, expected : {}'.format(sq_6.col, 5))
+
+  sq_7 = Square(63)
+
+  try:
+    IS_EQ(sq_7.row, 7)
+  except:
+    print('failed on test 16')
+
+  try:
+    IS_EQ(sq_7.col, 7)
+  except:
+    print('failed on test 17, input: {}, expected : {}'.format(sq_7.col, 7))
+
+
+
 
 
 

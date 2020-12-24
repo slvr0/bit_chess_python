@@ -49,9 +49,9 @@ class ChessBoard :
     self.black_castle_short  = True
     self.black_castle_long   = True
 
-    self.read_from_fen(fen_position=fen_position)
+    if fen_position != "" : self.read_from_fen(fen_position=fen_position)
 
-  def get_all_pieces(self, ours):
+  def get_all_pieces(self, ours = True):
     pieces = np.uint64(0)
 
     if ours :
@@ -120,6 +120,11 @@ class ChessBoard :
     assert ptype in self.pieces.keys()
     self.pieces[ptype] |= square.as_uint64()
 
+  def get_pieces_idx_from_uint(self, pieces_uint64):
+    pieces_as_bin = bin(pieces_uint64)[::-1][:-2]
+
+    return [idx.start() for idx in re.finditer('1', pieces_as_bin)]
+
   def get_pieces_idx(self, ptype = ''):
     assert ptype in self.pieces.keys()
 
@@ -163,6 +168,38 @@ class ChessBoard :
         idx += 1
     print('____A___B___C___D___E___F___G___H___')
 
+  def move_piece(self, ptype, sq_from = Square, sq_to = Square):
+    assert ptype in self.pieces.keys()
+
+    #sanity check
+    p_idxs = self.get_pieces_idx(ptype)
+
+    occup = False
+    for p_idx in p_idxs :
+      if p_idx == sq_from.as_int() :
+        occup = True
+
+    if not occup :
+      print("the square is not occupied by the ptype input, no action performed")
+      return
+
+    mfrom_mask = sq_from.as_uint64() ^ np.uint64(0xFFFFFFFFFFFFFFFF)
+    mto_mask = sq_to.as_uint64() ^ np.uint64(0xFFFFFFFFFFFFFFFF)
+    self.pieces[ptype] &= mfrom_mask #removes the piece from square
+
+    #remove what was currently on that square! abit sloppy but we dont know what we write over, so we remove all entries possible there
+    for k in self.pieces :
+      self.pieces[k] &= mto_mask
+
+    self.pieces[ptype] |= sq_to.as_uint64() #adds it to the new place
+
+
+  def print_bitboard(self, bitboard):
+    cb_t = ChessBoard()
+
+    fill_bit_idx = cb_t.get_pieces_idx_from_uint(bitboard)
+    for a_idx in fill_bit_idx: cb_t.add_piece(Square(a_idx), 'P')
+    cb_t.print_console()
 
   def print_fen(self):
     pass
