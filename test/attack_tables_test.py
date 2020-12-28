@@ -1,6 +1,6 @@
 from chess_board import ChessBoard
 from chess_square import Square, idx_to_row_col, row_col_to_idx
-from chess_attack_tables import IndexedKnightAttacks, IndexedBishopAttacks, IndexedRookAttacks, \
+from chess_attack_tables import IndexedKnightAttacks, \
   IndexedPawnAttacks, RookMagicBitboard, SlidingAttackTables, BishopMagicBitboard
 import numpy as np
 from utils import CombinationSolver, BinaryHelper
@@ -33,7 +33,6 @@ def run_attack_tables_test():
   attack_tables = SlidingAttackTables()
   attack_tables.init_sliding_attacks(rooks=True)
   attack_tables.init_sliding_attacks(rooks=False)
-
 
   #---#
   sp = 'rnbqk1nr/pppp2pp/3bp3/5p2/P4B2/2NP4/1PP1PPPP/R2QKBNR b KQkq - 1 4'
