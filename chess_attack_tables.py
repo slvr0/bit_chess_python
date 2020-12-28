@@ -250,16 +250,16 @@ class SlidingAttackTables :
     self.rook_init = False
     self.bishops_init = False
 
-  def query_rook_attacks(self, square = Square, occ = np.uint64):
+  def query_rook_attacks(self, square = int, occ = np.uint64):
     assert self.rook_init
 
-    blocker_uint64 = occ & self.r_magic.mask[square.as_int()]
+    blocker_uint64 = occ & self.r_magic.mask[square]
 
-    blocker_uint64 *= self.r_magic.magic_numbers[int(square.as_int())]
+    blocker_uint64 *= self.r_magic.magic_numbers[square]
 
-    blocker_uint64 >>= np.uint64(64) - self.r_magic.shifts[square.as_int()]
+    blocker_uint64 >>= np.uint64(64) - self.r_magic.shifts[square]
 
-    offset = int(self.r_offsets[square.as_int()])
+    offset = int(self.r_offsets[square])
 
     n_idx = int(offset + blocker_uint64)
 
@@ -268,13 +268,13 @@ class SlidingAttackTables :
   def query_bishop_attacks(self, square = Square, occ = np.uint64):
     assert self.bishops_init
 
-    blocker_uint64 = occ & self.b_magic.mask[square.as_int()]
+    blocker_uint64 = occ & self.b_magic.mask[square]
 
-    blocker_uint64 *= self.b_magic.magic_numbers[int(square.as_int())]
+    blocker_uint64 *= self.b_magic.magic_numbers[square]
 
-    blocker_uint64 >>= np.uint64(64) - self.b_magic.shifts[square.as_int()]
+    blocker_uint64 >>= np.uint64(64) - self.b_magic.shifts[square]
 
-    offset = int(self.b_offsets[square.as_int()])
+    offset = int(self.b_offsets[square])
 
     n_idx = int(offset + blocker_uint64)
 

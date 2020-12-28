@@ -193,8 +193,8 @@ class ChessBoard :
 
     self.pieces[ptype] |= sq_to.as_uint64() #adds it to the new place
 
-
-  def print_bitboard(self, bitboard):
+  @staticmethod
+  def print_bitboard(bitboard):
     cb_t = ChessBoard()
 
     fill_bit_idx = cb_t.get_pieces_idx_from_uint(bitboard)
