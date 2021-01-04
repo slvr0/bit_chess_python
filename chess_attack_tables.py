@@ -250,7 +250,7 @@ class SlidingAttackTables :
     self.rook_init = False
     self.bishops_init = False
 
-  def query_rook_attacks(self, square = int, occ = np.uint64):
+  def query_rook_attacks(self, square, occ = np.uint64(0)):
     assert self.rook_init
 
     blocker_uint64 = occ & self.r_magic.mask[square]
@@ -265,7 +265,7 @@ class SlidingAttackTables :
 
     return self.r_attacktables[n_idx]
 
-  def query_bishop_attacks(self, square = Square, occ = np.uint64):
+  def query_bishop_attacks(self, square, occ = np.uint64(0)):
     assert self.bishops_init
 
     blocker_uint64 = occ & self.b_magic.mask[square]
@@ -312,15 +312,12 @@ class SlidingAttackTables :
 
       BB_indices = cb.get_pieces_idx_from_uint(magic_board.mask[_square.as_int()])
 
-      all_blockerboard_combs = CombinationSolver.get_combinations(BB_indices)
-      all_blockerboard_combs.append([]) #add the board where all blocker squares are free
+      for i in range(0, 1 << len(BB_indices)):
+        occupation_mask = np.uint64(0)
 
-      for blocker_board in all_blockerboard_combs:
-
-        blocker_uint64 = np.uint64(0)
-
-        for bv in blocker_board:
-          blocker_uint64 |= np.uint64(1) << np.uint64(bv)
+        #this gets all combinations of blockers, i have a recursive solution for this , this one is weird to understand
+        for k in range(0, len(BB_indices)) :
+          if (np.uint64(1) << np.uint64(k)) & np.uint64(i) : occupation_mask |= np.uint64(1) << np.uint64(BB_indices[k])
 
         # now for this blocker board, calculate the legit move , the value we finally will be mapped
         # with this blockerboard
@@ -332,38 +329,93 @@ class SlidingAttackTables :
             row += rdir[1]
             col += rdir[0]
 
-            if not on_board(row, col) : break
+            if not on_board(row, col): break
 
             ns = Square(row_col_to_idx(row, col)).as_uint64()
 
             sq_to_bb |= ns
 
-            if (ns & blocker_uint64) != 0: break
+            if (ns & occupation_mask) != 0: break
 
-        #generate hash key and insert
-        blocker_uint64 &= magic_board.mask[_square.as_int()]  # unneccessary?
+        # generate hash key and insert
+        occupation_mask &= magic_board.mask[_square.as_int()]  # unneccessary?
 
-        blocker_uint64 *= magic_board.magic_numbers[int(_square.as_int())]
+        occupation_mask *= magic_board.magic_numbers[int(_square.as_int())]
 
-        blocker_uint64 >>= np.uint64(64) - magic_board.shifts[_square.as_int()]
+        occupation_mask >>= np.uint64(64) - magic_board.shifts[_square.as_int()]
 
-        if blocker_uint64 > 2 ** (magic_board.shifts[_square.as_int()]):
-          print("sanity check gone wrong, probably wrong in offset algorithm", blocker_uint64, )
+        if occupation_mask > 2 ** (magic_board.shifts[_square.as_int()]):
+          print("sanity check gone wrong, probably wrong in offset algorithm", occupation_mask, )
 
-        n_idx = int(offset + blocker_uint64)
+        n_idx = int(offset + occupation_mask)
 
-        if rooks :
+        if rooks:
           self.r_attacktables[n_idx] = sq_to_bb
-        else :
+        else:
           self.b_attacktables[n_idx] = sq_to_bb
 
         nr_filled += 1
 
-      # move the offset
+        # move the offset
       offset += 2 ** (magic_board.shifts[_square.as_int()])
+
 
     print("{} attack tables initialized. inserted {} attack configs".format('rooks' if rooks else 'bishops', nr_filled))
     if rooks : self.rook_init = True
     else : self.bishops_init = True
+
+
+#old solution, new solution doesnt seem faster
+
+# all_blockerboard_combs = CombinationSolver.get_combinations(BB_indices)
+      # all_blockerboard_combs.append([]) #add the board where all blocker squares are free
+      #
+      # #exchange blocker_board with a range loop from 0 to
+      # for blocker_board in all_blockerboard_combs:
+      #
+      #   blocker_uint64 = np.uint64(0)
+      #
+      #   for bv in blocker_board:
+      #     blocker_uint64 |= np.uint64(1) << np.uint64(bv)
+      #
+      #   # now for this blocker board, calculate the legit move , the value we finally will be mapped
+      #   # with this blockerboard
+      #   sq_to_bb = np.uint64(0)
+      #   for rdir in directions:
+      #     row, col = _square.row, _square.col
+      #
+      #     while True:
+      #       row += rdir[1]
+      #       col += rdir[0]
+      #
+      #       if not on_board(row, col) : break
+      #
+      #       ns = Square(row_col_to_idx(row, col)).as_uint64()
+      #
+      #       sq_to_bb |= ns
+      #
+      #       if (ns & blocker_uint64) != 0: break
+      #
+      #   #generate hash key and insert
+      #   blocker_uint64 &= magic_board.mask[_square.as_int()]  # unneccessary?
+      #
+      #   blocker_uint64 *= magic_board.magic_numbers[int(_square.as_int())]
+      #
+      #   blocker_uint64 >>= np.uint64(64) - magic_board.shifts[_square.as_int()]
+      #
+      #   if blocker_uint64 > 2 ** (magic_board.shifts[_square.as_int()]):
+      #     print("sanity check gone wrong, probably wrong in offset algorithm", blocker_uint64, )
+      #
+      #   n_idx = int(offset + blocker_uint64)
+      #
+      #   if rooks :
+      #     self.r_attacktables[n_idx] = sq_to_bb
+      #   else :
+      #     self.b_attacktables[n_idx] = sq_to_bb
+      #
+      #   nr_filled += 1
+      #
+      # # move the offset
+      # offset += 2 ** (magic_board.shifts[_square.as_int()])
 
 

@@ -6,7 +6,6 @@ import numpy as np
 def IS_EQ(v, comp) :
   assert v == comp
 
-
 def IS_GREATER(v, comp) :
   assert v > comp
 

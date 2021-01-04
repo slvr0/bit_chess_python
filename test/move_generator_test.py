@@ -32,42 +32,42 @@ def IS_EQUAL_LIST(vl, comp = []):
 def run_move_generator_test() :
   move_gen = MoveGenerator()
 
-  sp = '8/4K3/8/6N1/4r3/8/2k5/8 w - - 0 1'
-  cb = ChessBoard(fen_position=sp)
-  n_checkers,_ = move_gen.is_incheck(cb.get_all_pieces() | cb.get_all_pieces(False), cb.get_pieces_idx('K')[0], cb)
-  n_correct = 1
-  try :
-    IS_EQ(n_checkers, 1)
-  except:
-    print("error in test 1 , output : {} , correct : {}".format(n_checkers, n_correct))
+  # sp = '8/4K3/8/6N1/4r3/8/2k5/8 w - - 0 1'
+  # cb = ChessBoard(fen_position=sp)
+  # n_checkers = move_gen.get_enemy_attackinfo(cb)['n_checkers']
+  # n_correct = 1
+  # try :
+  #   IS_EQ(n_checkers, 1)
+  # except:
+  #   print("error in test 1 , output : {} , correct : {}".format(n_checkers, n_correct))
+  #
+  # sp2 = '8/4K3/3p4/6N1/4r3/8/2k5/8 w - - 0 1'
+  # cb2 = ChessBoard(fen_position=sp2)
+  # n_checkers = move_gen.get_enemy_attackinfo(cb2)['n_checkers']
+  # n_correct = 2
+  # try :
+  #   IS_EQ(n_checkers, n_correct)
+  # except:
+  #   print("error in test 2 , output : {} , correct : {}".format(n_checkers, n_correct))
+  #
+  # sp2 = '8/4K3/3p4/6N1/4r2b/8/2k5/8 w - - 0 1'
+  # cb2 = ChessBoard(fen_position=sp2)
+  # n_checkers = move_gen.get_enemy_attackinfo(cb2)['n_checkers']
+  # n_correct = 2
+  # try :
+  #   IS_EQ(n_checkers, n_correct)
+  # except:
+  #   print("error in test 3 , output : {} , correct : {}".format(n_checkers, n_correct))
+  #
+  # sp2 = '8/1q2K3/3p4/6N1/4r2b/8/2k5/8 w - - 0 1'
+  # cb2 = ChessBoard(fen_position=sp2)
+  # n_checkers = move_gen.get_enemy_attackinfo(cb2)['n_checkers']
+  # n_correct = 3
+  # try :
+  #   IS_EQ(n_checkers, n_correct)
+  # except:
+  #   print("error in test 4 , output : {} , correct : {}".format(n_checkers, n_correct))
 
-  sp2 = '8/4K3/3p4/6N1/4r3/8/2k5/8 w - - 0 1'
-  cb2 = ChessBoard(fen_position=sp2)
-  n_checkers,_ = move_gen.is_incheck(cb2.get_all_pieces() | cb2.get_all_pieces(False), cb.get_pieces_idx('K')[0], cb2)
-  n_correct = 2
-  try :
-    IS_EQ(n_checkers, n_correct)
-  except:
-    print("error in test 2 , output : {} , correct : {}".format(n_checkers, n_correct))
-
-  sp2 = '8/4K3/3p4/6N1/4r2b/8/2k5/8 w - - 0 1'
-  cb2 = ChessBoard(fen_position=sp2)
-  n_checkers,_ = move_gen.is_incheck(cb2.get_all_pieces() | cb2.get_all_pieces(False), cb.get_pieces_idx('K')[0], cb2)
-  n_correct = 2
-  try :
-    IS_EQ(n_checkers, n_correct)
-  except:
-    print("error in test 3 , output : {} , correct : {}".format(n_checkers, n_correct))
-
-  sp2 = '8/1q2K3/3p4/6N1/4r2b/8/2k5/8 w - - 0 1'
-  cb2 = ChessBoard(fen_position=sp2)
-  n_checkers,_ = move_gen.is_incheck(cb2.get_all_pieces() | cb2.get_all_pieces(False), cb.get_pieces_idx('K')[0], cb2)
-  n_correct = 3
-  try :
-    IS_EQ(n_checkers, n_correct)
-  except:
-    print("error in test 4 , output : {} , correct : {}".format(n_checkers, n_correct))
-
-  sp4 = '8/4K3/8/6N1/4r3/8/2k5/8 w - - 0 1'
+  sp4 = '3r4/8/5k2/8/3p4/3N4/3K2r1/8 w - - 0 1'
   cb4 = ChessBoard(fen_position=sp4)
   move_gen.generate_legal_moves(cb4)

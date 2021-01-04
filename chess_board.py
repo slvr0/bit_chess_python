@@ -51,6 +51,10 @@ class ChessBoard :
 
     if fen_position != "" : self.read_from_fen(fen_position=fen_position)
 
+  def get_piece_at_square(self, square):
+    for k in self.pieces :
+      if self.pieces[k] & Square(square).as_uint64() != 0 : return k
+
   def get_all_pieces(self, ours = True):
     pieces = np.uint64(0)
 
@@ -109,8 +113,14 @@ class ChessBoard :
       #print("at slot idx : {}, showing : {}".format(slot_idx,s))
 
       slot_idx += 1
-      str_iter +=1
+      str_iter += 1
     #skip enpassant move count and casting for now actually. just fill in pieces
+
+  def square_occupied_by(self, square):
+    for k in self.pieces :
+      if self.pieces[k] & (np.uint64(1) << np.uint64(square)) != 0 : return k
+
+    return ''
 
   def reset_board(self) :
     for key in self.pieces :
@@ -121,6 +131,8 @@ class ChessBoard :
     self.pieces[ptype] |= square.as_uint64()
 
   def get_pieces_idx_from_uint(self, pieces_uint64):
+    if pieces_uint64 == 0 : return []
+
     pieces_as_bin = bin(pieces_uint64)[::-1][:-2]
 
     return [idx.start() for idx in re.finditer('1', pieces_as_bin)]
