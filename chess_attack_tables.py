@@ -41,6 +41,17 @@ class IndexedPawnAttacks :
       0x0000000000000000, 0x0000000000000000, 0x0000000000000000,
       0x0000000000000000]
 
+    pawn_atk_tbl = [2**1, 2**0 + 2**2, 2**1 + 2**3, 2**2 + 2**4, 2**3 + 2**5, 2**4 + 2**6, 2**5 + 2**7, 2**6]
+
+    for row in range(1,7) :
+        [pawn_atk_tbl.append(v) for v in [pawn_atk_tbl[i] << 8*row for i in range(8)]]
+
+    pawn_atk_tbl = np.array(pawn_atk_tbl)
+    a0 = [0]*8
+
+    pawn_atk_tbl = np.concatenate([a0, pawn_atk_tbl], axis=0)
+    self.pawn_attacks_rev = [np.uint64(v) for v in pawn_atk_tbl]
+
     self.pawn_attacks = [np.uint64(v) for v in self.pawn_attacks] #convert entries to np.uint64
 
   def __getitem__(self, idx):

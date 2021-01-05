@@ -137,7 +137,7 @@ class MoveGenerator :
     #pawns
     p_idcs = cb.get_pieces_idx_from_uint(enemy_pawns)
     for p_idx in p_idcs :
-      attacks = self.pawn_attacks[p_idx]
+      attacks = self.pawn_attacks.pawn_attacks_rev[p_idx]
       attacking_mask |= attacks
       attacking_mask_noking |= attacks
       if attacks & king_pos != 0:
@@ -218,6 +218,27 @@ class MoveGenerator :
     'pin_mask' : pin_mask
     }
 
+  def generate_pseudo_legal_moves(self, cb):
+    t1 = time()
+
+    all_moves = ChessMoveList()
+
+    our_pieces = cb.get_all_pieces()
+    enemy_pieces = cb.get_all_pieces(ours=False)
+    all_pieces = our_pieces | enemy_pieces
+
+    #kingmoves
+    king_square = cb.get_pieces_idx('K')[0]
+    king_moves = self.get_kingmoves(king_square)
+    legal_king_moves = king_moves & ~all_pieces #'cheyck' if the piece is defended
+
+    m_idc = cb.get_pieces_idx_from_uint(legal_king_moves)
+
+    for k_move_idx in m_idc: all_moves.add_move(ChessMove(king_square, k_move_idx, ptype='K'))
+
+
+
+
   def generate_legal_moves(self, cb):
 
     t1 = time()
@@ -242,8 +263,6 @@ class MoveGenerator :
 
     legal_king_moves = king_moves & ~attack_mask_noking & ~all_pieces
 
-    cb.print_bitboard(legal_king_moves)
-
     m_idc = cb.get_pieces_idx_from_uint(legal_king_moves)
 
     for k_move_idx in m_idc: all_moves.add_move(ChessMove(king_square, k_move_idx, ptype='K'))
@@ -254,14 +273,42 @@ class MoveGenerator :
     king_in_check = True if n_checkers == 1 else False
 
     p_idcs = cb.get_pieces_idx('P')
-    #self.append_pawnmoves(cb, all_moves, all_pieces, p_idcs, king_in_check, attackinfo)
+    self.append_pawnmoves(cb, all_moves, all_pieces, p_idcs, king_in_check, attackinfo)
 
     kn_idcs = cb.get_pieces_idx('N')
     self.append_knightmoves(cb, all_moves, our_pieces, enemy_pieces, kn_idcs, king_in_check, attackinfo)
 
+    print(time()-t1)
     all_moves.print()
 
     return []
+
+  def append_bishopmoves(self, cb, chessmove_list, our_pieces, enemy_pieces, b_idcs, king_incheck, attackinfo):
+    ptype ='B'
+
+    pin_mask = attackinfo['pin_mask']
+    push_mask = attackinfo['push_mask']
+    capture_mask = attackinfo['capture_mask']
+
+    occ = our_pieces | enemy_pieces
+
+    for idx in b_idcs :
+      idx_64 = np.uint64(1) << np.uint64(idx)
+      if idx_64 & pin_mask != 0 : continue
+
+      attacks = self.sliding_attacktables.query_bishop_attacks(idx, occ)
+
+      if capture_mask != 0 and attacks & capture_mask != 0: add_capture_mask = True
+      else : add_capture_mask = False
+
+      if push_mask != 0 :
+        attacks &= push_mask
+
+      if add_capture_mask : attacks |= capture_mask
+
+      attack_idcs = cb.get_pieces_idx_from_uint(attacks)
+      [chessmove_list.add_move(ChessMove(_from=idx, to=n_idx, ptype=ptype)) for n_idx in attack_idcs]
+
 
   def append_knightmoves(self, cb, chessmove_list, our_pieces, enemy_pieces, kn_idcs, king_incheck, attackinfo):
     ptype = 'N'
@@ -276,17 +323,13 @@ class MoveGenerator :
 
       attacks = self.knight_attacks[idx]
 
-      if capture_mask != 0 and attacks & capture_mask != 0: add_capture_mask = True
-      else : add_capture_mask = False
-
-      if push_mask != 0 :
-        attacks &= push_mask
-
-      if add_capture_mask : attacks |= capture_mask
+      if king_incheck :
+        attacks = (push_mask & attacks) | (capture_mask & attacks)
+      else :
+        attacks &= ~our_pieces
 
       attack_idcs = cb.get_pieces_idx_from_uint(attacks)
-      [chessmove_list.add_move(ChessMove(_from=idx, to=n_idx, ptype=ptype)) for n_idx in attack_idcs \
-       if our_pieces & (np.uint64(1) << np.uint64(n_idx)) == 0]
+      [chessmove_list.add_move(ChessMove(_from=idx, to=n_idx, ptype=ptype)) for n_idx in attack_idcs]
 
   def append_pawnmoves(self, cb, chessmove_list, occ, p_idcs, king_incheck, attackinfo):
       one_move = 8
@@ -301,18 +344,20 @@ class MoveGenerator :
       ptype = 'P'
 
       for idx in p_idcs:
+        idx_64 = np.uint64(1) << np.uint64(idx)
 
-        n_sq_onemove = np.uint64(1 << idx + one_move)
-        n_sq_twomove = np.uint64(1 << idx + two_move)
+        n_sq_onemove = np.uint64(1) << np.uint64(idx + 8)
+        n_sq_twomove = np.uint64(1) << np.uint64(idx + 16)
 
         if king_incheck :
-          if pin_mask & (np.uint64(1) << np.uint64(idx)) != 0 : continue #pawn is in absolute pin,
+          if pin_mask & idx_64 != 0 : continue #pawn is in absolute pin,
 
           if n_sq_onemove & push_mask != 0 : chessmove_list.add_move(ChessMove(idx, idx + one_move, ptype=ptype))
           if n_sq_twomove & push_mask != 0 :
-            if idx <= 7:
-              if (np.uint64(1) << (idx + n_sq_twomove)) & occ == 0 and \
-                      ((np.uint64(1) << (idx + n_sq_onemove)) & occ) == 0:
+            if idx <= 15:
+
+              if n_sq_twomove & occ == 0 and \
+                     n_sq_onemove & occ == 0:
                 chessmove_list.add_move(ChessMove(idx, idx + two_move, ptype=ptype))
 
           attack_64 = self.pawn_attacks[idx]
@@ -321,6 +366,14 @@ class MoveGenerator :
             if (np.uint64(1) << np.uint64(a_sq)) & capture_mask != 0 : chessmove_list.add_move(ChessMove(idx, a_sq, ptype=ptype))
 
           continue #dont add normal moves
+
+        attack_64 = self.pawn_attacks[idx]
+        a_sq_idx = cb.get_pieces_idx_from_uint(attack_64)
+        for a_sq in a_sq_idx:
+          if (np.uint64(1) << np.uint64(a_sq)) & enemy_pieces != 0: chessmove_list.add_move(
+            ChessMove(idx, a_sq, ptype=ptype))
+
+        if pin_mask & idx_64 != 0: continue
 
         # add all one moves
         if n_sq_onemove & occ == 0:
@@ -332,10 +385,7 @@ class MoveGenerator :
                   n_sq_onemove & occ == 0: chessmove_list.add_move(
             ChessMove(idx, idx + two_move, ptype=ptype))
 
-        attack_64 = self.pawn_attacks[idx]
-        a_sq_idx = cb.get_pieces_idx_from_uint(attack_64)
-        for a_sq in a_sq_idx:
-          if (np.uint64(1) << np.uint64(a_sq)) & enemy_pieces != 0: chessmove_list.add_move(ChessMove(idx, a_sq, ptype=ptype))
+
 
 
 

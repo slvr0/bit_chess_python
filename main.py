@@ -34,7 +34,9 @@ from test.square_test import run_square_tests
 from test.board_test import run_board_tests
 from test.attack_tables_test import run_attack_tables_test
 from test.move_generator_test import run_move_generator_test
-from test.balloney import test
+
+import numpy as np
+
 if __name__ == '__main__':
 
     #test()
@@ -45,6 +47,7 @@ if __name__ == '__main__':
     #run_attack_tables_test()
 
     run_move_generator_test()
+
 
 
 
