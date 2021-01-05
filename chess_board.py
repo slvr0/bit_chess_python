@@ -13,6 +13,8 @@
 
 import numpy as np
 import re
+from chess_castle import Castling
+from utils import board_notations
 
 #example fen
     #rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
@@ -43,11 +45,9 @@ class ChessBoard :
 
     self.enpassant_sq = -1
     self.move_count = 0
+    self._50_rulecount = 0
 
-    self.white_castle_short  = True
-    self.white_castle_long   = True
-    self.black_castle_short  = True
-    self.black_castle_long   = True
+    self.castling = Castling()
 
     if fen_position != "" : self.read_from_fen(fen_position=fen_position)
 
@@ -114,7 +114,26 @@ class ChessBoard :
 
       slot_idx += 1
       str_iter += 1
-    #skip enpassant move count and casting for now actually. just fill in pieces
+    #skip enpassant move count and castling for now actually. just fill in pieces
+
+
+    rem_string = fen_position[str_iter : ]
+    rem_string = rem_string.split(' ')[1:]
+
+    self.white_to_act = True if rem_string[0] == 'w' else False
+    castle_string = rem_string[1]
+
+    self.castling.set_we_00(True if 'K' in castle_string else False)
+    self.castling.set_we_000(True if 'Q' in castle_string else False)
+    self.castling.set_enemy_00(True if 'k' in castle_string else False)
+    self.castling.set_enemy_000(True if 'q' in castle_string else False)
+
+    enp_sq = rem_string[2].upper()
+    if enp_sq != '-':
+      self.enpassant_sq = [index for index,_s in enumerate(board_notations) if enp_sq in _s][0]
+
+    self.move_count = int(rem_string[4])
+    self._50_rulecount = int(rem_string[3])
 
   def square_occupied_by(self, square):
     for k in self.pieces :
