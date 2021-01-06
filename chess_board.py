@@ -14,7 +14,7 @@
 import numpy as np
 import re
 from chess_castle import Castling
-from utils import board_notations
+from utils import board_notations, flip_horizontal, flip_vertical
 from chess_move import ChessMove
 
 #example fen
@@ -52,6 +52,43 @@ class ChessBoard :
     self.fen = fen_position
     
     if fen_position != "" : self.read_from_fen(fen_position=fen_position)
+
+  def mirror_side(self):
+    self.white_to_act = False if self.white_to_act else True
+
+    our_pawns = flip_vertical(flip_horizontal(self.pieces['P']))
+    our_knights = flip_vertical(flip_horizontal(self.pieces['N']))
+    our_bishops = flip_vertical(flip_horizontal(self.pieces['B']))
+    our_rooks = flip_vertical(flip_horizontal(self.pieces['R']))
+    our_queens = flip_vertical(flip_horizontal(self.pieces['Q']))
+    our_kings = flip_vertical(flip_horizontal(self.pieces['K']))
+
+    enemy_pawns = flip_vertical(flip_horizontal(self.pieces['p']))
+    enemy_knights = flip_vertical(flip_horizontal(self.pieces['n']))
+    enemy_bishops = flip_vertical(flip_horizontal(self.pieces['b']))
+    enemy_rooks = flip_vertical(flip_horizontal(self.pieces['r']))
+    enemy_queens = flip_vertical(flip_horizontal(self.pieces['q']))
+    enemy_kings = flip_vertical(flip_horizontal(self.pieces['k']))
+
+    self.pieces = {
+      'P': enemy_pawns,
+      'N': enemy_knights,
+      'B': enemy_bishops,
+      'R': enemy_rooks,
+      'Q': enemy_queens,
+      'K': enemy_kings,
+
+      'p': our_pawns,
+      'n': our_knights,
+      'b': our_bishops,
+      'r': our_rooks,
+      'q': our_queens,
+      'k': our_kings
+    }
+
+    self.castling.mirror()
+
+    self.enpassant_sq = 63 - self.enpassant_sq if self.enpassant_sq != -1 else -1
 
   def get_piece_at_square(self, square):
     for k in self.pieces :
@@ -171,14 +208,14 @@ class ChessBoard :
       self.add_piece(Square(to), ptype)
       self.remove_piece(Square(_from))
 
-      self.add_piece(Square(5), ptype)
+      self.add_piece(Square(5), 'R')
       self.remove_piece(Square(7))
 
     elif spec_action == 'O-O-O':
       self.add_piece(Square(to), ptype)
       self.remove_piece(Square(_from))
 
-      self.add_piece(Square(3), ptype)
+      self.add_piece(Square(3), 'R')
       self.remove_piece(Square(0))
 
     elif self.promotion is not None:

@@ -50,7 +50,7 @@ class ChessMoveList :
     else :
       self.moves.append(move)
 
-  def print(self):
+  def print(self, white_toact=True):
     p_translation = {
       'P': 'Pawn',
       'N': 'Knight',
@@ -59,7 +59,12 @@ class ChessMoveList :
       'Q': 'Queen',
       'K': 'King'
     }
+    if not white_toact :
+      bn = board_notations[::-1]
+    else :
+      bn = board_notations
+
     for chessmove in self.moves :
       print('------------------------ Chessmoves in position ------------------------')
-      print("Move : " , p_translation[chessmove.ptype], " from : ", board_notations[chessmove._from], " to : ",
-            board_notations[chessmove.to], " special info : ", chessmove.spec_action)
+      print("Move : " , p_translation[chessmove.ptype], " from : ", bn[chessmove._from], " to : ",
+            bn[chessmove.to], " special info : ", chessmove.spec_action)

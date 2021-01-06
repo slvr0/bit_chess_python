@@ -53,8 +53,23 @@ class CombinationSolver :
       for i, v in enumerate(arr):
         CombinationSolver.get_klen_combinations(arr[i + 1:], k - 1, accum + ' ' + str(v), entries)
 
+def flip_vertical(v):
+  v = (v & np.uint64(0x00000000FFFFFFFF)) << np.uint64(32) | (v & np.uint64(0xFFFFFFFF00000000)) >> np.uint64(32)
+  v = (v & np.uint64(0x0000FFFF0000FFFF)) << np.uint64(16) | (v & np.uint64(0xFFFF0000FFFF0000)) >> np.uint64(16)
+  v = (v & np.uint64(0x00FF00FF00FF00FF)) << np.uint64(8) | (v & np.uint64(0xFF00FF00FF00FF00)) >> np.uint64(8)
+  return v
+
+def flip_horizontal(x):
+  k1 = np.uint64(0x5555555555555555)
+  k2 = np.uint64(0x3333333333333333)
+  k4 = np.uint64(0x0f0f0f0f0f0f0f0f)
+  x = ((x >> np.uint64(1)) & k1) | ((x & k1) << np.uint64(1))
+  x = ((x >> np.uint64(2)) & k2) | ((x & k2) << np.uint64(2))
+  x = ((x >> np.uint64(4)) & k4) | ((x & k4) << np.uint64(4))
+  return x
+
 board_notations = \
-["A1","B1","C1","D1","E1","F1","G1","H1",
+[ "A1","B1","C1","D1","E1","F1","G1","H1",
   "A2","B2","C2","D2","E2","F2","G2","H2",
   "A3","B3","C3","D3","E3","F3","G3","H3",
   "A4","B4","C4","D4","E4","F4","G4","H4",
@@ -62,5 +77,7 @@ board_notations = \
   "A6","B6","C6","D6","E6","F6","G6","H6",
   "A7","B7","C7","D7","E7","F7","G7","H7",
   "A8","B8","C8","D8","E8","F8","G8","H8"]
+
+
 
 
