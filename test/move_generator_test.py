@@ -68,6 +68,6 @@ def run_move_generator_test() :
   # except:
   #   print("error in test 4 , output : {} , correct : {}".format(n_checkers, n_correct))
 
-  sp4 = '5k2/8/8/3Pp3/3K4/8/8/8 w - e6 0 2'
+  sp4 = '6k1/8/6b1/4pP2/8/3K4/8/8 w - - 0 2'
   cb4 = ChessBoard(fen_position=sp4)
   move_gen.generate_legal_moves(cb4)

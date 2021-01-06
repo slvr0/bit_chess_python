@@ -39,7 +39,35 @@ class MoveGenerator :
 
     return moves
 
-  #bug, what if enemy own piece cover rays
+
+  #this function covers the tricky horizontal discover check from enp captures, example here
+  #https://lichess.org/analysis/8/4p3/8/2KP3q/8/1k6/8/8_b_-_-_0_1#2
+  def spec_enp_legalcheck(self, cb, capt_from):
+    #check if rook/queen on rank
+    row, col = idx_to_row_col(capt_from)
+
+    full_row = np.uint8(0xFF)
+    full_row_idx = np.uint64(full_row << (row - 1) * 8)
+
+    kings = cb.pieces['k']
+    queens = cb.pieces['q']
+    our_king = cb.pieces['K']
+
+    if (kings | queens) & full_row_idx == 0 : return True
+    else :
+      lost_piece_sq = cb.enpassant_sq - 8
+
+      cap_64 = np.uint64(1) << np.uint64(capt_from)
+      cap_lost_64 = np.uint64(1) << np.uint64(lost_piece_sq)
+
+      #get all attacks rays without the enp pieces
+      all_atc_idc = cb.get_pieces_idx_from_uint(kings | queens)
+      occ_no_enp_pieces = (cb.get_all_pieces() | cb.get_all_pieces(ours=False)) & ~(cap_64 | cap_lost_64)
+      for a_idx in all_atc_idc :
+        attacks = self.sliding_attacktables.query_rook_attacks(a_idx, occ_no_enp_pieces)
+        if attacks & our_king != 0 : return False
+
+    #bug, what if enemy own piece cover rays
   def calc_pushmoves(self, our_pieces, enemy_pieces, ksq, attacker_sq, attacker_type):
     if attacker_type == 'r':
       m_dirs = ((1, 0), (-1, 0), (0, 1), (0, -1))
@@ -98,26 +126,6 @@ class MoveGenerator :
 
     return attack_mask, (pin_at, pin_attackray)
 
-  #calculate rays from square to king square, e.g. attacking path for a rook,bishop to the king
-  def get_capture_push_masks(self, attack_mask, king_square, cb):
-    attack_idcs = cb.get_pieces_idx_from_uint(attack_mask)
-
-    push_mask = np.uint64(0)
-    capture_mask = np.uint64(0)
-    our_pieces = cb.get_all_pieces()
-
-    for a_idx in attack_idcs :
-      occupied_piecetype = cb.square_occupied_by(a_idx)
-      if occupied_piecetype == 'r' or occupied_piecetype == 'b' or occupied_piecetype == 'q' :
-        push, pin =self.calc_pushmoves(our_pieces, king_square, a_idx, occupied_piecetype)
-        push_mask |= push
-
-      elif occupied_piecetype == 'n' :
-        capture_mask  |= np.uint64(1)  << a_idx
-
-    return push_mask, capture_mask
-
-  #bug remaining, we cant calculate enemy pawn attacks since they are reversed direction
   def get_enemy_attackinfo(self, cb ):
     king_pos = cb.pieces['K']
     king_idx = cb.get_pieces_idx_from_uint(king_pos)[0]
@@ -127,6 +135,9 @@ class MoveGenerator :
     enemy_bishops = cb.pieces['b']
     enemy_queens = cb.pieces['q']
     enemy_rooks = cb.pieces['r']
+
+    enemy_king_pos = cb.pieces['k']
+    enemy_king_idx = cb.get_pieces_idx_from_uint(enemy_king_pos)[0]
 
     our_pieces = cb.get_all_pieces()
     enemy_pieces = cb.get_all_pieces(ours=False)
@@ -140,6 +151,11 @@ class MoveGenerator :
     push_mask = np.uint64(0) #attack squares between slider and king
     capture_mask = np.uint64(0) #attack squares where
     pins = [] #attack squares where pieces cannot move, now a tuple (at, from)
+
+    enemy_king_moves = self.get_kingmoves(enemy_king_idx) & ~occ
+
+    attacking_mask |= enemy_king_moves
+    attacking_mask_noking |= enemy_king_moves
 
     #pawns
     p_idcs = cb.get_pieces_idx_from_uint(enemy_pawns)
@@ -225,28 +241,7 @@ class MoveGenerator :
     'pins' : pins
     }
 
-  def generate_pseudo_legal_moves(self, cb):
-    t1 = time()
-
-    all_moves = ChessMoveList()
-
-    our_pieces = cb.get_all_pieces()
-    enemy_pieces = cb.get_all_pieces(ours=False)
-    all_pieces = our_pieces | enemy_pieces
-
-    #kingmoves
-    king_square = cb.get_pieces_idx('K')[0]
-    king_moves = self.get_kingmoves(king_square)
-    legal_king_moves = king_moves & ~all_pieces #'cheyck' if the piece is defended
-
-    m_idc = cb.get_pieces_idx_from_uint(legal_king_moves)
-
-    for k_move_idx in m_idc: all_moves.add_move(ChessMove(king_square, k_move_idx, ptype='K'))
-
   def generate_legal_moves(self, cb):
-
-    t1 = time()
-
     all_moves = ChessMoveList()
 
     attackinfo = self.get_enemy_attackinfo(cb)
@@ -254,6 +249,7 @@ class MoveGenerator :
     n_checkers = attackinfo['n_checkers']
     attack_mask = attackinfo['attack_mask']
     attack_mask_noking = attackinfo['attack_mask_noking']
+    capture_mask = attackinfo['capture_mask']
 
     our_pieces = cb.get_all_pieces()
     enemy_pieces = cb.get_all_pieces(ours=False)
@@ -262,7 +258,7 @@ class MoveGenerator :
     king_square = cb.get_pieces_idx('K')[0]
     king_moves = self.get_kingmoves(king_square)
 
-    legal_king_moves = king_moves & ~attack_mask_noking & ~all_pieces
+    legal_king_moves = king_moves & ~attack_mask_noking & ~our_pieces | capture_mask & ~attack_mask
 
     m_idc = cb.get_pieces_idx_from_uint(legal_king_moves)
 
@@ -290,16 +286,15 @@ class MoveGenerator :
 
     #castle moves
     if not king_in_check :
+
       csq_00_64 = np.uint64(1) << np.uint64(5) | np.uint64(1) << np.uint64(6)
       csq_000_64 = np.uint64(1) << np.uint64(2) | np.uint64(1) << np.uint64(3)
 
-      if cb.castling.we_can_00 :
-        if csq_00_64 & attack_mask : all_moves.add_move(ChessMove(4, 6, 'K', 'O-O'))
-      if cb.castling.we_can_000 :
-        if csq_000_64 & attack_mask : all_moves.add_move(ChessMove(4, 2, 'K', 'O-O-O'))
-
-    #print(time()-t1)
-    all_moves.print()
+      #we're able to castle, there's nothing there and there's nothing attacking connected castle squares. its then legal
+      if cb.castling.we_00() :
+        if csq_00_64 & all_pieces == 0 and csq_00_64 &  attack_mask  == 0 : all_moves.add_move(ChessMove(4, 6, 'K', 'O-O'))
+      if cb.castling.we_000() :
+        if csq_000_64 & all_pieces == 0 and csq_000_64 & attack_mask == 0 : all_moves.add_move(ChessMove(4, 2, 'K', 'O-O-O'))
 
     return []
 
@@ -487,7 +482,6 @@ class MoveGenerator :
       enemy_pieces = cb.get_all_pieces(ours=False)
 
       enp_sq = np.uint64(cb.enpassant_sq)
-      enp_64 = np.uint64(0) if enp_sq == -1 else np.uint64(1) << enp_sq
 
       ptype = 'P'
 
@@ -542,7 +536,8 @@ class MoveGenerator :
 
         for a_sq in a_sq_idx:
           if enp_sq == a_sq:
-            chessmove_list.add_move(ChessMove(idx, a_sq, ptype=ptype, spec_action='enp'))
+            if self.spec_enp_legalcheck(cb, a_sq) :
+              chessmove_list.add_move(ChessMove(idx, a_sq, ptype=ptype, spec_action='enp'))
 
           if (np.uint64(1) << np.uint64(a_sq)) & enemy_pieces != 0: chessmove_list.add_move(
             ChessMove(idx, a_sq, ptype=ptype))
