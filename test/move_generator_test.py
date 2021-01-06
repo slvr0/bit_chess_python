@@ -68,6 +68,19 @@ def run_move_generator_test() :
   # except:
   #   print("error in test 4 , output : {} , correct : {}".format(n_checkers, n_correct))
 
-  sp4 = '6k1/8/6b1/4pP2/8/3K4/8/8 w - - 0 2'
+  sp4 = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
   cb4 = ChessBoard(fen_position=sp4)
-  move_gen.generate_legal_moves(cb4)
+
+  moves = move_gen.generate_legal_moves(cb4)
+  m_idx = np.random.randint(0, len(moves))
+
+  move = moves[m_idx]
+  move.print()
+
+  cb4.update_from_move(move)
+  cb4.print_console()
+
+  
+
+
+

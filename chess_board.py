@@ -15,6 +15,7 @@ import numpy as np
 import re
 from chess_castle import Castling
 from utils import board_notations
+from chess_move import ChessMove
 
 #example fen
     #rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
@@ -48,7 +49,8 @@ class ChessBoard :
     self._50_rulecount = 0
 
     self.castling = Castling()
-
+    self.fen = fen_position
+    
     if fen_position != "" : self.read_from_fen(fen_position=fen_position)
 
   def get_piece_at_square(self, square):
@@ -116,7 +118,6 @@ class ChessBoard :
       str_iter += 1
     #skip enpassant move count and castling for now actually. just fill in pieces
 
-
     rem_string = fen_position[str_iter : ]
     rem_string = rem_string.split(' ')[1:]
 
@@ -145,11 +146,84 @@ class ChessBoard :
     for key in self.pieces :
       self.pieces[key] = np.uint64(0)
 
-  def add_piece(self, square , ptype = '') :
+  def add_piece(self, square, ptype = '') :
     assert ptype in self.pieces.keys()
     self.pieces[ptype] |= square.as_uint64()
 
-  def get_pieces_idx_from_uint(self, pieces_uint64):
+  def remove_piece(self, square):
+    for k in self.pieces :
+      self.pieces[k] &= ~square.as_uint64()
+
+  def update_from_move(self, move):
+    _from = move._from
+    to = move.to
+    ptype = move.ptype
+    spec_action = move.spec_action
+    self.promotion = move.promotion
+
+    #this is the special cases, so just deal with them right away
+    if spec_action == 'enp' :
+      self.add_piece(Square(to), ptype)
+      self.remove_piece(Square(_from))
+      self.remove_piece(Square(to - 8))
+
+    elif spec_action == 'O-O':
+      self.add_piece(Square(to), ptype)
+      self.remove_piece(Square(_from))
+
+      self.add_piece(Square(5), ptype)
+      self.remove_piece(Square(7))
+
+    elif spec_action == 'O-O-O':
+      self.add_piece(Square(to), ptype)
+      self.remove_piece(Square(_from))
+
+      self.add_piece(Square(3), ptype)
+      self.remove_piece(Square(0))
+
+    elif self.promotion is not None:
+      self.remove_piece(Square(to))
+      promo_type = self.promotion.type
+      self.remove_piece(Square(_from))
+      self.add_piece(Square(to), promo_type)
+
+    else :
+      #normale
+      self.remove_piece(Square(to))
+      self.remove_piece(Square(_from))
+      self.add_piece(Square(to), ptype)
+
+    self.move_count += 1
+    self._50_rulecount = self._50_rulecount + 1 if ptype != 'P' else 0
+
+    self.enpassant_sq = -1
+    if ptype == 'P' and _from >= 8 and _from < 16 :
+      dm = to - _from
+      if dm == 16 : self.enpassant_sq = to - 8
+
+    self.castling.update_castlestatus(chessmove=move)
+
+
+
+
+    #remove piece from square
+    #add piece to new square
+
+    # cover special s
+    #castling action
+    #enp action
+    #promotion
+
+    #update move count
+    #update 50 move rule
+    #update enp square
+
+    #update fen
+    #update castling
+    pass
+
+  @staticmethod
+  def get_pieces_idx_from_uint(pieces_uint64):
     if pieces_uint64 == 0 : return []
 
     pieces_as_bin = bin(pieces_uint64)[::-1][:-2]
@@ -197,32 +271,7 @@ class ChessBoard :
       else:
         print(' |', printer[idx].decode("utf-8"), end='')
         idx += 1
-    print('____A___B___C___D___E___F___G___H___')
-
-  def move_piece(self, ptype, sq_from = Square, sq_to = Square):
-    assert ptype in self.pieces.keys()
-
-    #sanity check
-    p_idxs = self.get_pieces_idx(ptype)
-
-    occup = False
-    for p_idx in p_idxs :
-      if p_idx == sq_from.as_int() :
-        occup = True
-
-    if not occup :
-      print("the square is not occupied by the ptype input, no action performed")
-      return
-
-    mfrom_mask = sq_from.as_uint64() ^ np.uint64(0xFFFFFFFFFFFFFFFF)
-    mto_mask = sq_to.as_uint64() ^ np.uint64(0xFFFFFFFFFFFFFFFF)
-    self.pieces[ptype] &= mfrom_mask #removes the piece from square
-
-    #remove what was currently on that square! abit sloppy but we dont know what we write over, so we remove all entries possible there
-    for k in self.pieces :
-      self.pieces[k] &= mto_mask
-
-    self.pieces[ptype] |= sq_to.as_uint64() #adds it to the new place
+    print('____A___B___C___D___E___F___G___H___')  
 
   @staticmethod
   def print_bitboard(bitboard):
@@ -232,8 +281,13 @@ class ChessBoard :
     for a_idx in fill_bit_idx: cb_t.add_piece(Square(a_idx), 'P')
     cb_t.print_console()
 
-  def print_fen(self):
-    pass
+  def get_fen(self):
+    #this should read the pieces and not just return the string
+    return self.fen
+  
+  
+  
+  
 
 
 

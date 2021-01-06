@@ -7,8 +7,6 @@ from chess_move import ChessMove, ChessMoveList
 #implementation will be influenced by
 #https://peterellisjones.com/posts/generating-legal-chess-moves-efficiently/
 
-#i will start at generating legal king moves
-
 from time import time
 
 class MoveGenerator :
@@ -38,7 +36,6 @@ class MoveGenerator :
 
 
     return moves
-
 
   #this function covers the tricky horizontal discover check from enp captures, example here
   #https://lichess.org/analysis/8/4p3/8/2KP3q/8/1k6/8/8_b_-_-_0_1#2
@@ -296,7 +293,7 @@ class MoveGenerator :
       if cb.castling.we_000() :
         if csq_000_64 & all_pieces == 0 and csq_000_64 & attack_mask == 0 : all_moves.add_move(ChessMove(4, 2, 'K', 'O-O-O'))
 
-    return []
+    return all_moves
 
   def append_queenmoves(self, cb, chessmove_list, our_pieces, enemy_pieces, b_idcs, king_incheck, attackinfo):
     ptype ='Q'
