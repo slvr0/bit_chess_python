@@ -1,5 +1,5 @@
-from chess_board import ChessBoard
-from chess_square import Square
+from core.chess_board import ChessBoard
+from core.chess_square import Square
 
 import numpy as np
 
@@ -98,13 +98,6 @@ def run_board_tests():
     print('failed on test 13, output : {}, compare : {}'.format(ind_black_list, correct_black))
 
 
-  chessboard4 = ChessBoard()
-  chessboard4.read_from_fen(sp1)
-
-  chessboard4.move_piece('r', Square(56), Square(24))
-
-  chessboard4.move_piece('Q', Square(3), Square(62))
-  chessboard4.print_console()
 
 
 

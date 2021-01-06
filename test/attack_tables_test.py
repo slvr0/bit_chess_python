@@ -1,9 +1,9 @@
-from chess_board import ChessBoard
-from chess_square import Square, idx_to_row_col, row_col_to_idx
-from chess_attack_tables import IndexedKnightAttacks, \
+from core.chess_board import ChessBoard
+from core.chess_square import Square, idx_to_row_col, row_col_to_idx
+from core.chess_attack_tables import IndexedKnightAttacks, \
   IndexedPawnAttacks, RookMagicBitboard, SlidingAttackTables, BishopMagicBitboard
 import numpy as np
-from utils import CombinationSolver, BinaryHelper
+from core.utils import CombinationSolver, BinaryHelper
 
 def IS_EQ(v, comp) :
   assert v == comp
@@ -28,11 +28,9 @@ def IS_EQUAL_LIST(vl, comp = []):
   for v in vl :
     assert v in comp
 
-def run_attack_tables_test():
+def run_attack_tables_test(move_gen):
 
-  attack_tables = SlidingAttackTables()
-  attack_tables.init_sliding_attacks(rooks=True)
-  attack_tables.init_sliding_attacks(rooks=False)
+  attack_tables = move_gen.sliding_attacktables
 
   #---#
   sp = 'rnbqk1nr/pppp2pp/3bp3/5p2/P4B2/2NP4/1PP1PPPP/R2QKBNR b KQkq - 1 4'

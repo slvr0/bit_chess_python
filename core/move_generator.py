@@ -1,8 +1,8 @@
-from chess_square import *
-from chess_board import ChessBoard
-from utils import *
-from chess_attack_tables import *
-from chess_move import ChessMove, ChessMoveList
+from core.chess_square import *
+from core.chess_board import ChessBoard
+from core.utils import *
+from core.chess_attack_tables import *
+from core.chess_move import ChessMove, ChessMoveList
 
 #implementation will be influenced by
 #https://peterellisjones.com/posts/generating-legal-chess-moves-efficiently/
@@ -12,9 +12,13 @@ from time import time
 class MoveGenerator :
   def __init__(self):
     self.sliding_attacktables = SlidingAttackTables()
+
+    with warnings.catch_warnings():
+      warnings.simplefilter('error')
+
     self.sliding_attacktables.init_sliding_attacks(rooks=True)
     self.sliding_attacktables.init_sliding_attacks(rooks=False)
-    
+
     self.pawn_attacks = IndexedPawnAttacks()
     self.knight_attacks = IndexedKnightAttacks()
 

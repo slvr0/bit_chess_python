@@ -1,5 +1,4 @@
-
-from chess_square import Square
+from core.chess_square import Square
 
 def IS_EQ(v, comp) :
   assert v == comp
@@ -29,7 +28,7 @@ def run_square_tests():
   except : print("failed on test 1 ")
 
   try : sq_3 = Square(6000)
-  except : print("failed on test 2 [THIS TEST IS SUPPOSED TO FAIL!]")
+  except : print("passed test 2")
 
   try :     IS_EQ(sq_1.as_uint64(), 9223372036854775808)
   except : print("failed on test 3 ")

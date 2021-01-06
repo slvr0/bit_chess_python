@@ -13,14 +13,14 @@
 
 import numpy as np
 import re
-from chess_castle import Castling
-from utils import board_notations, flip_horizontal, flip_vertical
-from chess_move import ChessMove
+from core.chess_castle import Castling
+from core.utils import board_notations, flip_horizontal, flip_vertical
+from core.chess_move import ChessMove
 
 #example fen
     #rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
 
-from chess_square import Square
+from core.chess_square import Square
 
 class ChessBoard :
   def __init__(self, fen_position = "") :
@@ -239,25 +239,6 @@ class ChessBoard :
       if dm == 16 : self.enpassant_sq = to - 8
 
     self.castling.update_castlestatus(chessmove=move)
-
-
-
-
-    #remove piece from square
-    #add piece to new square
-
-    # cover special s
-    #castling action
-    #enp action
-    #promotion
-
-    #update move count
-    #update 50 move rule
-    #update enp square
-
-    #update fen
-    #update castling
-    pass
 
   @staticmethod
   def get_pieces_idx_from_uint(pieces_uint64):

@@ -1,6 +1,6 @@
 
 import numpy as np
-from utils import board_notations
+from core.utils import board_notations
 
 class Promotion :
   def __init__(self, type):

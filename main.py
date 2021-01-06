@@ -28,25 +28,12 @@
 #the memory and its algorithm, playing games will result in millions of positions, it will be too broad action space,
 #have to be limited , learn about monte carlo search tree to optimize the training data
 
-from chess_board import ChessBoard
-
-from test.square_test import run_square_tests
-from test.board_test import run_board_tests
-from test.attack_tables_test import run_attack_tables_test
-from test.move_generator_test import run_move_generator_test
-
-import numpy as np
+from test.run_tests import _run_tests
 
 if __name__ == '__main__':
+    _run_tests()
 
-    #test()
 
-
-    #run_square_tests()
-    #run_board_tests()
-    #run_attack_tables_test()
-
-    run_move_generator_test()
 
 
 
