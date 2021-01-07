@@ -10,6 +10,14 @@ class Castling :
 
     self.castle_info_serialized = np.uint16(0xFFFF)
 
+  def reset(self) :
+    self.we_can_00 = True
+    self.we_can_000 = True
+    self.enemy_can_00 = True
+    self.enemy_can_000 = True
+
+    self.castle_info_serialized = np.uint16(0xFFFF)
+
   def update_castlestatus(self, chessmove):
     pt = chessmove.ptype
     if pt == 'K' :

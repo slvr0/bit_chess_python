@@ -9,10 +9,13 @@ from core.chess_move import ChessMove, ChessMoveList
 
 from time import time
 
+#so much bad code here , many functions and code snippets repeating
+
 class MoveGenerator :
   def __init__(self):
     self.sliding_attacktables = SlidingAttackTables()
 
+    #trying to sort out overflow issue
     with warnings.catch_warnings():
       warnings.simplefilter('error')
 
@@ -37,7 +40,6 @@ class MoveGenerator :
 
         if r >= 0 and r < 8 and c >= 0 and c < 8 :
           moves |= Square(row_col_to_idx(r,c)).as_uint64()
-
 
     return moves
 
@@ -129,6 +131,7 @@ class MoveGenerator :
 
   def get_enemy_attackinfo(self, cb ):
     king_pos = cb.pieces['K']
+
     king_idx = cb.get_pieces_idx_from_uint(king_pos)[0]
 
     enemy_pawns = cb.pieces['p']
@@ -138,6 +141,10 @@ class MoveGenerator :
     enemy_rooks = cb.pieces['r']
 
     enemy_king_pos = cb.pieces['k']
+
+    if len(cb.get_pieces_idx_from_uint(enemy_king_pos)) == 0 :
+      cb.print_console()
+
     enemy_king_idx = cb.get_pieces_idx_from_uint(enemy_king_pos)[0]
 
     our_pieces = cb.get_all_pieces()
@@ -158,6 +165,8 @@ class MoveGenerator :
     attacking_mask |= enemy_king_moves
     attacking_mask_noking |= enemy_king_moves
 
+    knight_attacking_king = False
+
     #pawns
     p_idcs = cb.get_pieces_idx_from_uint(enemy_pawns)
     for p_idx in p_idcs :
@@ -166,7 +175,6 @@ class MoveGenerator :
       attacking_mask_noking |= attacks
       if attacks & king_pos != 0:
         n_checkers += 1
-        push_mask |= attacks
         capture_mask |= np.uint64(1) << np.uint64(p_idx)
 
     #knights
@@ -177,7 +185,7 @@ class MoveGenerator :
       attacking_mask_noking |= attacks
       if attacks & king_pos != 0 :
         n_checkers += 1
-        push_mask |= attacks
+        knight_attacking_king = True
         capture_mask |= np.uint64(1) << np.uint64(kn_idx)
 
     #bishops
@@ -233,6 +241,9 @@ class MoveGenerator :
           push_mask |= push
           capture_mask |= np.uint64(1) << np.uint64(q_idx)
 
+    if knight_attacking_king :
+      push_mask = np.uint64(0)
+
     return {
     'n_checkers' : n_checkers,
     'attack_mask' : attacking_mask,
@@ -259,7 +270,8 @@ class MoveGenerator :
     king_square = cb.get_pieces_idx('K')[0]
     king_moves = self.get_kingmoves(king_square)
 
-    legal_king_moves = king_moves & ~attack_mask_noking & ~our_pieces | capture_mask & ~attack_mask
+    #bug, the king can capture anywhere on the board if he's under check
+    legal_king_moves = king_moves & (~attack_mask_noking & ~our_pieces & (~enemy_pieces & ~attack_mask))
 
     m_idc = cb.get_pieces_idx_from_uint(legal_king_moves)
 
@@ -268,22 +280,24 @@ class MoveGenerator :
     if n_checkers >= 2 :
       return all_moves #there's no other options
 
-    king_in_check = True if n_checkers == 1 else False
+    king_in_check = True if n_checkers >= 1 else False
+
+    enemy_king_pos = cb.pieces['k']
 
     p_idcs = cb.get_pieces_idx('P')
-    self.append_pawnmoves(cb, all_moves, all_pieces, p_idcs, king_in_check, attackinfo)
+    self.append_pawnmoves(cb, all_moves, all_pieces, p_idcs, king_in_check, attackinfo, enemy_king_pos)
 
     kn_idcs = cb.get_pieces_idx('N')
-    self.append_knightmoves(cb, all_moves, our_pieces, enemy_pieces, kn_idcs, king_in_check, attackinfo)
+    self.append_knightmoves(cb, all_moves, our_pieces, enemy_pieces, kn_idcs, king_in_check, attackinfo, enemy_king_pos)
 
     b_idcs = cb.get_pieces_idx('B')
-    self.append_bishopmoves(cb, all_moves, our_pieces, enemy_pieces, b_idcs, king_in_check, attackinfo)
+    self.append_bishopmoves(cb, all_moves, our_pieces, enemy_pieces, b_idcs, king_in_check, attackinfo, enemy_king_pos)
 
     r_idcs = cb.get_pieces_idx('R')
-    self.append_rookmoves(cb, all_moves, our_pieces, enemy_pieces, r_idcs, king_in_check, attackinfo)
+    self.append_rookmoves(cb, all_moves, our_pieces, enemy_pieces, r_idcs, king_in_check, attackinfo, enemy_king_pos)
 
     q_idcs = cb.get_pieces_idx('Q')
-    self.append_queenmoves(cb, all_moves, our_pieces, enemy_pieces, q_idcs, king_in_check, attackinfo)
+    self.append_queenmoves(cb, all_moves, our_pieces, enemy_pieces, q_idcs, king_in_check, attackinfo, enemy_king_pos)
 
     #castle moves
     if not king_in_check :
@@ -299,7 +313,7 @@ class MoveGenerator :
 
     return all_moves
 
-  def append_queenmoves(self, cb, chessmove_list, our_pieces, enemy_pieces, b_idcs, king_incheck, attackinfo):
+  def append_queenmoves(self, cb, chessmove_list, our_pieces, enemy_pieces, b_idcs, king_incheck, attackinfo, enemy_king_pos):
     ptype ='Q'
 
     pins = attackinfo['pins']
@@ -311,7 +325,7 @@ class MoveGenerator :
     for idx in b_idcs :
       idx_64 = np.uint64(1) << np.uint64(idx)
       attacks = (self.sliding_attacktables.query_rook_attacks(idx, occ) | self.sliding_attacktables.query_bishop_attacks(idx, occ)) \
-                & ~our_pieces
+                & ~(our_pieces | enemy_king_pos)
 
       is_pinned = False
 
@@ -325,8 +339,7 @@ class MoveGenerator :
         if capture_mask != 0 and attacks & capture_mask != 0: add_capture_mask = True
         else : add_capture_mask = False
 
-        if push_mask != 0 :
-          attacks &= push_mask
+        attacks &= push_mask
 
         if add_capture_mask : attacks |= capture_mask
 
@@ -349,7 +362,7 @@ class MoveGenerator :
         attack_idcs = cb.get_pieces_idx_from_uint(attacks)
         [chessmove_list.add_move(ChessMove(_from=idx, to=n_idx, ptype=ptype)) for n_idx in attack_idcs]
 
-  def append_rookmoves(self, cb, chessmove_list, our_pieces, enemy_pieces, b_idcs, king_incheck, attackinfo):
+  def append_rookmoves(self, cb, chessmove_list, our_pieces, enemy_pieces, b_idcs, king_incheck, attackinfo, enemy_king_pos):
     ptype ='R'
 
     pins = attackinfo['pins']
@@ -360,7 +373,7 @@ class MoveGenerator :
 
     for idx in b_idcs :
       idx_64 = np.uint64(1) << np.uint64(idx)
-      attacks = self.sliding_attacktables.query_rook_attacks(idx, occ) & ~our_pieces
+      attacks = self.sliding_attacktables.query_rook_attacks(idx, occ) & ~(our_pieces | enemy_king_pos)
       is_pinned = False
 
       if king_incheck :
@@ -373,8 +386,7 @@ class MoveGenerator :
         if capture_mask != 0 and attacks & capture_mask != 0: add_capture_mask = True
         else : add_capture_mask = False
 
-        if push_mask != 0 :
-          attacks &= push_mask
+        attacks &= push_mask
 
         if add_capture_mask : attacks |= capture_mask
 
@@ -397,7 +409,7 @@ class MoveGenerator :
         attack_idcs = cb.get_pieces_idx_from_uint(attacks)
         [chessmove_list.add_move(ChessMove(_from=idx, to=n_idx, ptype=ptype)) for n_idx in attack_idcs]
 
-  def append_bishopmoves(self, cb, chessmove_list, our_pieces, enemy_pieces, b_idcs, king_incheck, attackinfo):
+  def append_bishopmoves(self, cb, chessmove_list, our_pieces, enemy_pieces, b_idcs, king_incheck, attackinfo, enemy_king_pos):
     ptype ='B'
 
     pins = attackinfo['pins']
@@ -408,7 +420,7 @@ class MoveGenerator :
 
     for idx in b_idcs :
       idx_64 = np.uint64(1) << np.uint64(idx)
-      attacks = self.sliding_attacktables.query_bishop_attacks(idx, occ) & ~our_pieces
+      attacks = self.sliding_attacktables.query_bishop_attacks(idx, occ) & ~(our_pieces | enemy_king_pos)
       is_pinned = False
 
       if king_incheck :
@@ -421,8 +433,7 @@ class MoveGenerator :
         if capture_mask != 0 and attacks & capture_mask != 0: add_capture_mask = True
         else : add_capture_mask = False
 
-        if push_mask != 0 :
-          attacks &= push_mask
+        attacks &= push_mask
 
         if add_capture_mask : attacks |= capture_mask
 
@@ -445,7 +456,7 @@ class MoveGenerator :
         attack_idcs = cb.get_pieces_idx_from_uint(attacks)
         [chessmove_list.add_move(ChessMove(_from=idx, to=n_idx, ptype=ptype)) for n_idx in attack_idcs]
 
-  def append_knightmoves(self, cb, chessmove_list, our_pieces, enemy_pieces, kn_idcs, king_incheck, attackinfo):
+  def append_knightmoves(self, cb, chessmove_list, our_pieces, enemy_pieces, kn_idcs, king_incheck, attackinfo, enemy_king_pos):
     ptype = 'N'
 
     pins = attackinfo['pins']
@@ -463,7 +474,7 @@ class MoveGenerator :
 
       if is_pinned : continue
 
-      attacks = self.knight_attacks[idx] &  ~our_pieces
+      attacks = self.knight_attacks[idx] &  ~(our_pieces | enemy_king_pos)
 
       if king_incheck :
         attacks = (push_mask & attacks) | (capture_mask & attacks)
@@ -472,7 +483,7 @@ class MoveGenerator :
       attack_idcs = cb.get_pieces_idx_from_uint(attacks)
       [chessmove_list.add_move(ChessMove(_from=idx, to=n_idx, ptype=ptype)) for n_idx in attack_idcs]
 
-  def append_pawnmoves(self, cb, chessmove_list, occ, p_idcs, king_incheck, attackinfo):
+  def append_pawnmoves(self, cb, chessmove_list, occ, p_idcs, king_incheck, attackinfo, enemy_king_pos):
       one_move = 8
       two_move = 16
 
@@ -501,7 +512,10 @@ class MoveGenerator :
 
           if is_pinned : continue
 
-          if n_sq_onemove & push_mask != 0 : chessmove_list.add_move(ChessMove(idx, idx + one_move, ptype=ptype))
+          #bug, this captured our own king :D mb could be issues in future, not 100 %
+          if n_sq_onemove & push_mask != 0 :
+
+            chessmove_list.add_move(ChessMove(idx, idx + one_move, ptype=ptype))
           if n_sq_twomove & push_mask != 0 :
             if idx <= 15:
               if n_sq_twomove & occ == 0 and \
@@ -527,7 +541,7 @@ class MoveGenerator :
             is_pinned = True
             break
 
-        attack_64 = self.pawn_attacks[idx]
+        attack_64 = self.pawn_attacks[idx] & ~enemy_king_pos
 
         if is_pinned :
           _, _from_ray = pins[pin_index]

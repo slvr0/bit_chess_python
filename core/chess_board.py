@@ -17,12 +17,57 @@ from core.chess_castle import Castling
 from core.utils import board_notations, flip_horizontal, flip_vertical
 from core.chess_move import ChessMove
 
+from time import time
+
 #example fen
     #rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
 
 from core.chess_square import Square
+from copy import deepcopy
 
 class ChessBoard :
+
+  #calling reset from doesn't reposition from fen string rather from the input chessboard pieces, which is much faster
+  def reset_from(self, cb):
+
+    self.pieces = deepcopy(cb.pieces)
+
+    self.white_to_act = cb.white_to_act
+    self.enpassant_sq = cb.enpassant_sq
+    self.move_count = cb.move_count
+    self._50_rulecount = cb._50_rulecount
+
+    self.castling = cb.castling
+    self.fen = cb.fen
+
+  def reset(self):
+    self.pieces = {
+
+      'P': np.uint64(0),
+      'N': np.uint64(0),
+      'B': np.uint64(0),
+      'R': np.uint64(0),
+      'Q': np.uint64(0),
+      'K': np.uint64(0),
+
+      'p': np.uint64(0),
+      'n': np.uint64(0),
+      'b': np.uint64(0),
+      'r': np.uint64(0),
+      'q': np.uint64(0),
+      'k': np.uint64(0)
+    }
+
+    self.white_to_act = True
+
+    self.enpassant_sq = -1
+    self.move_count = 0
+    self._50_rulecount = 0
+
+    self.castling.reset()
+
+    if self.fen != "": self.read_from_fen(fen_position=self.fen)
+
   def __init__(self, fen_position = "") :
 
     self.pieces = {
@@ -42,11 +87,16 @@ class ChessBoard :
     'k' : np.uint64(0)
     }
 
+    self.our_pieces = self.pieces['P'] | self.pieces['N'] | self.pieces['B'] | self.pieces['R'] | self.pieces['Q'] | self.pieces['K']
+    self.enemy_pieces = self.pieces['p'] | self.pieces['n'] | self.pieces['b'] | self.pieces['r'] | self.pieces['q'] | \
+                      self.pieces['k']
+
     self.white_to_act = True
 
     self.enpassant_sq = -1
     self.move_count = 0
     self._50_rulecount = 0
+
 
     self.castling = Castling()
     self.fen = fen_position
@@ -54,45 +104,60 @@ class ChessBoard :
     if fen_position != "" : self.read_from_fen(fen_position=fen_position)
 
   def mirror_side(self):
+    t0 = time()
+
     self.white_to_act = False if self.white_to_act else True
 
-    our_pawns = flip_vertical(flip_horizontal(self.pieces['P']))
-    our_knights = flip_vertical(flip_horizontal(self.pieces['N']))
-    our_bishops = flip_vertical(flip_horizontal(self.pieces['B']))
-    our_rooks = flip_vertical(flip_horizontal(self.pieces['R']))
-    our_queens = flip_vertical(flip_horizontal(self.pieces['Q']))
-    our_kings = flip_vertical(flip_horizontal(self.pieces['K']))
+    our_pawns = flip_horizontal(flip_vertical(self.pieces['P']))
+    our_knights = flip_horizontal(flip_vertical(self.pieces['N']))
+    our_bishops = flip_horizontal(flip_vertical(self.pieces['B']))
+    our_rooks = flip_horizontal(flip_vertical(self.pieces['R']))
+    our_queens = flip_horizontal(flip_vertical(self.pieces['Q']))
+    our_kings = flip_horizontal(flip_vertical(self.pieces['K']))
 
-    enemy_pawns = flip_vertical(flip_horizontal(self.pieces['p']))
-    enemy_knights = flip_vertical(flip_horizontal(self.pieces['n']))
-    enemy_bishops = flip_vertical(flip_horizontal(self.pieces['b']))
-    enemy_rooks = flip_vertical(flip_horizontal(self.pieces['r']))
-    enemy_queens = flip_vertical(flip_horizontal(self.pieces['q']))
-    enemy_kings = flip_vertical(flip_horizontal(self.pieces['k']))
+    enemy_pawns = flip_horizontal(flip_vertical(self.pieces['p']))
+    enemy_knights = flip_horizontal(flip_vertical(self.pieces['n']))
+    enemy_bishops = flip_horizontal(flip_vertical(self.pieces['b']))
+    enemy_rooks = flip_horizontal(flip_vertical(self.pieces['r']))
+    enemy_queens = flip_horizontal(flip_vertical(self.pieces['q']))
+    enemy_kings = flip_horizontal(flip_vertical(self.pieces['k']))
 
-    self.pieces = {
-      'P': enemy_pawns,
-      'N': enemy_knights,
-      'B': enemy_bishops,
-      'R': enemy_rooks,
-      'Q': enemy_queens,
-      'K': enemy_kings,
+    print("time to mirror : ", time() - t0)
 
-      'p': our_pawns,
-      'n': our_knights,
-      'b': our_bishops,
-      'r': our_rooks,
-      'q': our_queens,
-      'k': our_kings
-    }
+    self.pieces['P'] = enemy_pawns
+    self.pieces['N'] = enemy_knights
+    self.pieces['B'] = enemy_bishops
+    self.pieces['R'] = enemy_rooks
+    self.pieces['Q'] = enemy_queens
+    self.pieces['K'] = enemy_kings
+
+    self.pieces['p'] = our_pawns
+    self.pieces['n'] = our_knights
+    self.pieces['b'] = our_bishops
+    self.pieces['r'] = our_rooks
+    self.pieces['q'] = our_queens
+    self.pieces['k'] = our_kings
+
+    tmp = self.our_pieces
+    self.our_pieces = self.enemy_pieces
+    self.enemy_pieces = tmp
 
     self.castling.mirror()
 
     self.enpassant_sq = 63 - self.enpassant_sq if self.enpassant_sq != -1 else -1
 
+
   def get_piece_at_square(self, square):
     for k in self.pieces :
       if self.pieces[k] & Square(square).as_uint64() != 0 : return k
+
+  def get_all_pieces_fb(self):
+    pieces = np.uint64(0)
+
+    for k in self.pieces :
+      pieces |= self.pieces[k]
+
+    return pieces
 
   def get_all_pieces(self, ours = True):
     pieces = np.uint64(0)
@@ -184,7 +249,7 @@ class ChessBoard :
       self.pieces[key] = np.uint64(0)
 
   def add_piece(self, square, ptype = '') :
-    assert ptype in self.pieces.keys()
+    #assert ptype in self.pieces.keys()
     self.pieces[ptype] |= square.as_uint64()
 
   def remove_piece(self, square):
@@ -192,11 +257,14 @@ class ChessBoard :
       self.pieces[k] &= ~square.as_uint64()
 
   def update_from_move(self, move):
+
+    t0 = time()
+
     _from = move._from
     to = move.to
     ptype = move.ptype
     spec_action = move.spec_action
-    self.promotion = move.promotion
+    promotion = move.promotion
 
     #this is the special cases, so just deal with them right away
     if spec_action == 'enp' :
@@ -218,11 +286,10 @@ class ChessBoard :
       self.add_piece(Square(3), 'R')
       self.remove_piece(Square(0))
 
-    elif self.promotion is not None:
+    elif promotion != '':
       self.remove_piece(Square(to))
-      promo_type = self.promotion.type
       self.remove_piece(Square(_from))
-      self.add_piece(Square(to), promo_type)
+      self.add_piece(Square(to), promotion)
 
     else :
       #normale
@@ -238,7 +305,14 @@ class ChessBoard :
       dm = to - _from
       if dm == 16 : self.enpassant_sq = to - 8
 
+    self.our_pieces = self.pieces['P'] | self.pieces['N'] | self.pieces['B'] | self.pieces['R'] | self.pieces['Q'] | \
+                      self.pieces['K']
+    self.enemy_pieces = self.pieces['p'] | self.pieces['n'] | self.pieces['b'] | self.pieces['r'] | self.pieces['q'] | \
+                        self.pieces['k']
+
     self.castling.update_castlestatus(chessmove=move)
+
+    #print("time to update move : " , time() - t0)
 
   @staticmethod
   def get_pieces_idx_from_uint(pieces_uint64):

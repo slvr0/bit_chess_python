@@ -2,10 +2,7 @@
 import numpy as np
 from core.utils import board_notations
 
-class Promotion :
-  def __init__(self, type):
-    self.type = ['knight', 'bishop', 'rook', 'queen']
-    assert type in self.type
+promo_types = ['N', 'B', 'R', 'Q']
 
 class ChessMove :
   def __init__(self, _from, to, ptype = '', spec_action = ''):
@@ -13,10 +10,7 @@ class ChessMove :
     self.to = to
     self.ptype = ptype
     self.spec_action = spec_action
-    self.promotion = None
-
-  def add_promotion_info(self, type):
-    self.promotion = Promotion(type)
+    self.promotion = ''
 
   def print(self):
     p_translation = {
@@ -30,6 +24,23 @@ class ChessMove :
     print("Move : ", p_translation[self.ptype], " from : ", board_notations[self._from], " to : ",
         board_notations[self.to], " special info : ", self.spec_action)
 
+  def _str(self, white_toact=True) :
+    p_translation = {
+      'P': 'Pawn',
+      'N': 'Knight',
+      'B': 'Bishop',
+      'R': 'Rook',
+      'Q': 'Queen',
+      'K': 'King'
+    }
+    if not white_toact:
+      bn = board_notations[::-1]
+    else:
+      bn = board_notations
+
+    return "Move : " + p_translation[self.ptype] + " from : " + bn[self._from] + " to : " + \
+           bn[self.to] + " special info : " + self.spec_action
+
 class ChessMoveList :
   def __init__(self):
     self.moves = []
@@ -42,9 +53,9 @@ class ChessMoveList :
 
   def add_move(self, move):
     if move.ptype == 'P' and move.to >= 55 :
-      for promo_type in ['knight', 'bishop', 'rook', 'queen'] : # i dont know how i want this
-        promo_move = ChessMove(move._from, move.to, move.ptype, '=' + promo_type)
-        promo_move.promotion = Promotion(promo_type)
+      for i in range(4) : # i dont know how i want this
+        promo_move = ChessMove(move._from, move.to, move.ptype, '=' + promo_types[i])
+        promo_move.promotion = promo_types[i]
         self.moves.append(promo_move)
 
     else :

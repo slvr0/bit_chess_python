@@ -279,8 +279,9 @@ class SlidingAttackTables :
 
     magic_board = RookMagicBitboard() if rooks else BishopMagicBitboard()
 
+    _square = Square(0)
     for i in range(64):
-      _square = Square(i)
+      _square.set(i)
 
       if rooks :
         self.r_offsets.append(offset)
@@ -292,7 +293,7 @@ class SlidingAttackTables :
       for i in range(0, 1 << len(BB_indices)):
         occupation_mask = np.uint64(0)
 
-        #this gets all combinations of blockers, i have a recursive solution for this , this one is weird to understand
+        #(lc0 algorithm), this gets all combinations of blockers, i have a recursive solution for this , this one is weird to understand
         for k in range(0, len(BB_indices)) :
           if (np.uint64(1) << np.uint64(k)) & np.uint64(i) : occupation_mask |= np.uint64(1) << np.uint64(BB_indices[k])
 

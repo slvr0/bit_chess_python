@@ -29,11 +29,37 @@
 #have to be limited , learn about monte carlo search tree to optimize the training data
 
 from test.run_tests import _run_tests
+from test.random_chessplay_test import run_test
+from test.move_generator_test import run_move_generator_test
+from core.move_generator import MoveGenerator
+
+from time import time
+import numpy as np
 
 if __name__ == '__main__':
-    _run_tests()
+    #run_test()
+    #move_gen = MoveGenerator()
+    #run_move_generator_test(move_gen)
 
 
+    iters = 1000000
+
+    t0 = time()
+    for _ in range(iters) :
+        bin_0 = 0x000F
+        bin_1 = 0x0F00
+
+        b2 = bin_0 & bin_1
+    t1 = time()
+
+    for _ in range(iters):
+        bin_0 = np.uint64(0x000F)
+        bin_1 = np.uint64(0x0F00)
+
+        b2 = bin_0 & bin_1
+    t2 = time()
+
+    print("time without casting : ", t1 - t0, "time with casting : ", t2 - t1)
 
 
 

@@ -2,6 +2,7 @@
 from copy import deepcopy
 import numpy as np
 
+from copy import deepcopy
 class BinaryHelper :
   def __init__(self):
     pass

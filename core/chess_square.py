@@ -99,6 +99,12 @@ class Square :
   def as_uint64(self):
     return self.idx_64
 
+  def set(self, idx):
+    self.idx = idx
+    self.row, self.col = idx_to_row_col(self.idx)
+
+    self.idx_64 = square_idx_to_uin64t[self.idx]
+
 
   def __str__(self):
     return square_str_not[self.idx]
