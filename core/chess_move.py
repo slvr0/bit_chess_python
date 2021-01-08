@@ -12,7 +12,7 @@ class ChessMove :
     self.spec_action = spec_action
     self.promotion = ''
 
-  def print(self):
+  def print(self, white_toact=True):
     p_translation = {
       'P': 'Pawn',
       'N': 'Knight',
@@ -21,8 +21,15 @@ class ChessMove :
       'Q': 'Queen',
       'K': 'King'
     }
-    print("Move : ", p_translation[self.ptype], " from : ", board_notations[self._from], " to : ",
-        board_notations[self.to], " special info : ", self.spec_action)
+    # if not white_toact:
+    #   bn = board_notations[::-1]
+    # else:
+    #   bn = board_notations
+
+    bn = board_notations
+    print('------------------------ Chessmoves in position ------------------------')
+    print("Move : ", p_translation[self.ptype], " from : ", bn[self._from], " to : ",
+          bn[self.to], " special info : ", self.spec_action)
 
   def _str(self, white_toact=True) :
     p_translation = {

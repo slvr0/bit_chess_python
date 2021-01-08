@@ -32,45 +32,24 @@ def run_attack_tables_test(move_gen):
 
   attack_tables = move_gen.sliding_attacktables
 
-  #---#
-  sp = 'rnbqk1nr/pppp2pp/3bp3/5p2/P4B2/2NP4/1PP1PPPP/R2QKBNR b KQkq - 1 4'
+  sp = '2k5/8/3n4/8/8/8/8/R1K5 w Q - 0 1'
+  # ---#
   cb = ChessBoard(fen_position=sp)
-  occ = cb.get_all_pieces() | cb.get_all_pieces(ours=False)
-  attack_squares = attack_tables.query_rook_attacks(1, occ)
+  occ = cb.our_pieces | cb.enemy_pieces
 
-  b1 = BinaryHelper.create_bin_from_int_list([0, 2, 3, 9])
-  try :
-    IS_EQ(attack_squares, b1)
+  attack_squares = attack_tables.query_rook_attacks(0, occ)
+
+  bin_idcs = BinaryHelper.create_bin_from_int_list([1, 2, 8, 16, 24, 32, 40, 48, 56])
+  try:
+    IS_EQ(attack_squares, bin_idcs)
   except:
-    print('failed on test 1, output : {}, compare : {}'.format(attack_squares, b1))
-
-  #---#
-  sp2 = 'rnbqk1nr/pppp2pp/3bp3/8/P3p3/2NP4/1PP2PPP/R1BQKBNR w KQkq - 0 5'
-  cb = ChessBoard(fen_position=sp2)
-  occ = cb.get_all_pieces() | cb.get_all_pieces(ours=False)
-  attack_squares2 = attack_tables.query_rook_attacks(29, occ)
-
-  b2 = BinaryHelper.create_bin_from_int_list([28, 37, 45, 53, 61, 21, 13, 30, 31])
-  try :
-    IS_EQ(attack_squares2, b2)
-  except:
-    print('failed on test 2, output : {}, compare : {}'.format(attack_squares2, b2))
-
-  #---#
-  sp3 = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-  cb = ChessBoard(fen_position=sp3)
-  occ = cb.get_all_pieces() | cb.get_all_pieces(ours=False)
-  attack_squares3 = attack_tables.query_bishop_attacks(2, occ)
-  b3 = BinaryHelper.create_bin_from_int_list([9, 11])
-  try :
-    IS_EQ(attack_squares3, b3)
-  except:
-    print('failed on test 3, output : {}, compare : {}'.format(attack_squares3, b3))
+    print('failed on test 1, output : {}, compare : {}'.format(attack_squares, bin_idcs))
 
   # ---#
   sp4 = 'rnbqkbnr/ppp1pp1p/6p1/3p4/1P6/8/PBPPPPPP/RN1QKBNR w KQkq - 0 3'
   cb = ChessBoard(fen_position=sp4)
-  occ = cb.get_all_pieces() | cb.get_all_pieces(ours=False)
+  occ = cb.our_pieces | cb.enemy_pieces
+
   attack_squares4 = attack_tables.query_bishop_attacks(9, occ)
   b4 = BinaryHelper.create_bin_from_int_list([0, 16,2,18, 27, 36, 45, 54, 63])
   try:
@@ -78,8 +57,29 @@ def run_attack_tables_test(move_gen):
   except:
     print('failed on test 4, output : {}, compare : {}'.format(attack_squares4, b4))
 
+  # ---#
+  sp5= '7K/8/8/8/8/8/pp2B3/Qp6 w - - 0 1'
+  cb = ChessBoard(fen_position=sp5)
+  occ = cb.our_pieces | cb.enemy_pieces
+  attack_squares4 = attack_tables.query_bishop_attacks(12, occ)
+  b4 = BinaryHelper.create_bin_from_int_list([5,19,26,33,40,3,21,30,39])
+  try:
+    IS_EQ(attack_squares4, b4)
+  except:
+    print('failed on test 5, output : {}, compare : {}'.format(attack_squares4, b4))
 
+  #---#
+  sp = '2k5/8/3n4/8/8/8/8/B1K5 w - - 0 1'
+  cb = ChessBoard(fen_position=sp)
+  occ = cb.our_pieces | cb.enemy_pieces
 
+  attack_squares = attack_tables.query_bishop_attacks(0, occ)
+
+  bin_idcs = BinaryHelper.create_bin_from_int_list([9,18,27,36,45,54,63])
+  try:
+    IS_EQ(attack_squares, bin_idcs)
+  except:
+    print('failed on test 6, output : {}, compare : {}'.format(attack_squares, bin_idcs))
 
 
 

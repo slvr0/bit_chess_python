@@ -16,6 +16,9 @@ import re
 from core.chess_castle import Castling
 from core.utils import board_notations, flip_horizontal, flip_vertical
 from core.chess_move import ChessMove
+from core.chess_square import _idx_64
+
+from core.utils import _np_one, _np_zero, _np_64
 
 from time import time
 
@@ -31,6 +34,9 @@ class ChessBoard :
   def reset_from(self, cb):
 
     self.pieces = deepcopy(cb.pieces)
+
+    self.our_pieces = cb.our_pieces
+    self.enemy_pieces = cb.enemy_pieces
 
     self.white_to_act = cb.white_to_act
     self.enpassant_sq = cb.enpassant_sq
@@ -66,12 +72,14 @@ class ChessBoard :
 
     self.castling.reset()
 
+    self.our_pieces = _np_zero
+    self.enemy_pieces = _np_zero
+
     if self.fen != "": self.read_from_fen(fen_position=self.fen)
 
   def __init__(self, fen_position = "") :
 
     self.pieces = {
-
     'P': np.uint64(0),
     'N': np.uint64(0),
     'B': np.uint64(0),
@@ -91,12 +99,13 @@ class ChessBoard :
     self.enemy_pieces = self.pieces['p'] | self.pieces['n'] | self.pieces['b'] | self.pieces['r'] | self.pieces['q'] | \
                       self.pieces['k']
 
+    self.all_pieces = self.get_board()
+
     self.white_to_act = True
 
     self.enpassant_sq = -1
     self.move_count = 0
     self._50_rulecount = 0
-
 
     self.castling = Castling()
     self.fen = fen_position
@@ -104,7 +113,6 @@ class ChessBoard :
     if fen_position != "" : self.read_from_fen(fen_position=fen_position)
 
   def mirror_side(self):
-    t0 = time()
 
     self.white_to_act = False if self.white_to_act else True
 
@@ -122,8 +130,6 @@ class ChessBoard :
     enemy_queens = flip_horizontal(flip_vertical(self.pieces['q']))
     enemy_kings = flip_horizontal(flip_vertical(self.pieces['k']))
 
-    print("time to mirror : ", time() - t0)
-
     self.pieces['P'] = enemy_pawns
     self.pieces['N'] = enemy_knights
     self.pieces['B'] = enemy_bishops
@@ -138,39 +144,21 @@ class ChessBoard :
     self.pieces['q'] = our_queens
     self.pieces['k'] = our_kings
 
-    tmp = self.our_pieces
-    self.our_pieces = self.enemy_pieces
-    self.enemy_pieces = tmp
+    all = self.our_pieces | self.enemy_pieces
+
+    self.our_pieces = enemy_pawns | enemy_knights | enemy_bishops | enemy_rooks | enemy_kings
+    self.enemy_pieces = our_pawns | our_knights | our_bishops | our_rooks | our_kings
 
     self.castling.mirror()
 
     self.enpassant_sq = 63 - self.enpassant_sq if self.enpassant_sq != -1 else -1
 
-
   def get_piece_at_square(self, square):
     for k in self.pieces :
       if self.pieces[k] & Square(square).as_uint64() != 0 : return k
 
-  def get_all_pieces_fb(self):
-    pieces = np.uint64(0)
-
-    for k in self.pieces :
-      pieces |= self.pieces[k]
-
-    return pieces
-
-  def get_all_pieces(self, ours = True):
-    pieces = np.uint64(0)
-
-    if ours :
-      pc_keys = ['P', 'N', 'B', 'R', 'Q', 'K']
-    else :
-      pc_keys = ['p', 'n', 'b', 'r', 'q', 'k']
-
-    for k in pc_keys :
-      pieces |= self.pieces[k]
-
-    return pieces
+  def get_board(self):
+    return self.our_pieces | self.enemy_pieces
 
   def read_from_fen(self, fen_position):
     #read entry , count slashes for line division. have a counter for what square we are
@@ -212,7 +200,7 @@ class ChessBoard :
       #skipping linebreaks and empty void and cancelling at end information,
       #only thing going here is piece info
 
-      self.add_piece(Square(slot_idx), s)
+      self.add_piece(slot_idx, s)
 
       #print("at slot idx : {}, showing : {}".format(slot_idx,s))
 
@@ -245,20 +233,38 @@ class ChessBoard :
     return ''
 
   def reset_board(self) :
-    for key in self.pieces :
-      self.pieces[key] = np.uint64(0)
+    for key in self.pieces : self.pieces[key] = _np_zero
 
-  def add_piece(self, square, ptype = '') :
+    self.our_pieces = _np_zero
+    self.enemy_pieces = _np_zero
+    self.all_pieces = _np_zero
+
+  def add_piece(self, at_idx, ptype = '') :
     #assert ptype in self.pieces.keys()
-    self.pieces[ptype] |= square.as_uint64()
+    self.pieces[ptype] |= _idx_64[at_idx]
 
-  def remove_piece(self, square):
+    if ptype.isupper() :
+      self.our_pieces |= _idx_64[at_idx]
+    else :
+      self.enemy_pieces |= _idx_64[at_idx]
+
+  def remove_piece(self, at_idx):
+    occ_type = ''
+    sq_64 = _idx_64[at_idx]
+    sq_64_inv = ~sq_64
+
     for k in self.pieces :
-      self.pieces[k] &= ~square.as_uint64()
+      self.pieces[k] &= sq_64_inv
+      if self.pieces[k] & sq_64 :
+        occ_type = k
+        break
+
+    if occ_type.isupper() :
+      self.our_pieces &= ~_idx_64[at_idx]
+    else :
+      self.enemy_pieces &= ~_idx_64[at_idx]
 
   def update_from_move(self, move):
-
-    t0 = time()
 
     _from = move._from
     to = move.to
@@ -268,34 +274,34 @@ class ChessBoard :
 
     #this is the special cases, so just deal with them right away
     if spec_action == 'enp' :
-      self.add_piece(Square(to), ptype)
-      self.remove_piece(Square(_from))
-      self.remove_piece(Square(to - 8))
+      self.add_piece(to, ptype)
+      self.remove_piece(_from)
+      self.remove_piece(to - 8)
 
     elif spec_action == 'O-O':
-      self.add_piece(Square(to), ptype)
-      self.remove_piece(Square(_from))
+      self.add_piece(to, ptype)
+      self.remove_piece(_from)
 
-      self.add_piece(Square(5), 'R')
-      self.remove_piece(Square(7))
+      self.add_piece(5, 'R')
+      self.remove_piece(7)
 
     elif spec_action == 'O-O-O':
-      self.add_piece(Square(to), ptype)
-      self.remove_piece(Square(_from))
+      self.add_piece(to, ptype)
+      self.remove_piece(_from)
 
-      self.add_piece(Square(3), 'R')
-      self.remove_piece(Square(0))
+      self.add_piece(3, 'R')
+      self.remove_piece(0)
 
     elif promotion != '':
-      self.remove_piece(Square(to))
-      self.remove_piece(Square(_from))
-      self.add_piece(Square(to), promotion)
+      self.remove_piece(to)
+      self.remove_piece(_from)
+      self.add_piece(to, promotion)
 
     else :
       #normale
-      self.remove_piece(Square(to))
-      self.remove_piece(Square(_from))
-      self.add_piece(Square(to), ptype)
+      self.remove_piece(to)
+      self.remove_piece(_from)
+      self.add_piece(to, ptype)
 
     self.move_count += 1
     self._50_rulecount = self._50_rulecount + 1 if ptype != 'P' else 0
@@ -305,14 +311,7 @@ class ChessBoard :
       dm = to - _from
       if dm == 16 : self.enpassant_sq = to - 8
 
-    self.our_pieces = self.pieces['P'] | self.pieces['N'] | self.pieces['B'] | self.pieces['R'] | self.pieces['Q'] | \
-                      self.pieces['K']
-    self.enemy_pieces = self.pieces['p'] | self.pieces['n'] | self.pieces['b'] | self.pieces['r'] | self.pieces['q'] | \
-                        self.pieces['k']
-
     self.castling.update_castlestatus(chessmove=move)
-
-    #print("time to update move : " , time() - t0)
 
   @staticmethod
   def get_pieces_idx_from_uint(pieces_uint64):
@@ -370,7 +369,7 @@ class ChessBoard :
     cb_t = ChessBoard()
 
     fill_bit_idx = cb_t.get_pieces_idx_from_uint(bitboard)
-    for a_idx in fill_bit_idx: cb_t.add_piece(Square(a_idx), 'P')
+    for a_idx in fill_bit_idx: cb_t.add_piece(a_idx, 'P')
     cb_t.print_console()
 
   def get_fen(self):

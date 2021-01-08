@@ -3,6 +3,11 @@ from copy import deepcopy
 import numpy as np
 
 from copy import deepcopy
+
+_np_one = np.uint64(1)
+_np_zero = np.uint64(0)
+_np_64 = np.uint64(64)
+
 class BinaryHelper :
   def __init__(self):
     pass
@@ -54,19 +59,38 @@ class CombinationSolver :
       for i, v in enumerate(arr):
         CombinationSolver.get_klen_combinations(arr[i + 1:], k - 1, accum + ' ' + str(v), entries)
 
+fl_v_0 = np.uint64(0x00000000FFFFFFFF)
+fl_v_1 = np.uint64(0xFFFFFFFF00000000)
+
+fl_v_2 = np.uint64(0x0000FFFF0000FFFF)
+fl_v_3 = np.uint64(0xFFFF0000FFFF0000)
+
+fl_v_4 = np.uint64(0x00FF00FF00FF00FF)
+fl_v_5 = np.uint64(0xFF00FF00FF00FF00)
+
+fl_v_np8 = np.uint64(8)
+fl_v_np16 = np.uint64(16)
+fl_v_np32 = np.uint64(32)
+
 def flip_vertical(v):
-  v = (v & np.uint64(0x00000000FFFFFFFF)) << np.uint64(32) | (v & np.uint64(0xFFFFFFFF00000000)) >> np.uint64(32)
-  v = (v & np.uint64(0x0000FFFF0000FFFF)) << np.uint64(16) | (v & np.uint64(0xFFFF0000FFFF0000)) >> np.uint64(16)
-  v = (v & np.uint64(0x00FF00FF00FF00FF)) << np.uint64(8) | (v & np.uint64(0xFF00FF00FF00FF00)) >> np.uint64(8)
+  v = (v & fl_v_0) << fl_v_np32 | (v & fl_v_1) >> fl_v_np32
+  v = (v & fl_v_2) << fl_v_np16 | (v & fl_v_3) >> fl_v_np16
+  v = (v & fl_v_4) << fl_v_np8  | (v & fl_v_5) >> fl_v_np8
   return v
 
+k1 = np.uint64(0x5555555555555555)
+k2 = np.uint64(0x3333333333333333)
+k4 = np.uint64(0x0f0f0f0f0f0f0f0f)
+#
+fl_h_np1 = np.uint64(1)
+fl_h_np2 = np.uint64(2)
+fl_h_np4 = np.uint64(4)
+
 def flip_horizontal(x):
-  k1 = np.uint64(0x5555555555555555)
-  k2 = np.uint64(0x3333333333333333)
-  k4 = np.uint64(0x0f0f0f0f0f0f0f0f)
-  x = ((x >> np.uint64(1)) & k1) | ((x & k1) << np.uint64(1))
-  x = ((x >> np.uint64(2)) & k2) | ((x & k2) << np.uint64(2))
-  x = ((x >> np.uint64(4)) & k4) | ((x & k4) << np.uint64(4))
+
+  x = ((x >> fl_h_np1) & k1) | ((x & k1) << fl_h_np1)
+  x = ((x >> fl_h_np2) & k2) | ((x & k2) << fl_h_np2)
+  x = ((x >> fl_h_np4) & k4) | ((x & k4) << fl_h_np4)
   return x
 
 board_notations = \

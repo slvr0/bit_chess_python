@@ -2,9 +2,12 @@ import numpy as np
 from core.chess_square import Square
 from core.chess_board import ChessBoard
 
-from core.chess_square import Square, idx_to_row_col, row_col_to_idx
+from core.chess_square import Square, _idx_64, idx_to_row_col, row_col_to_idx
 from core.utils import CombinationSolver
 
+import ctypes
+
+from time import time
 #some help understanding
 #https://stackoverflow.com/questions/30680559/how-to-find-magic-bitboards
 
@@ -19,29 +22,14 @@ import warnings
 
 class IndexedPawnAttacks :
   def __init__(self):
-    self.pawn_attacks = [
-      0x0000000000000200, 0x0000000000000500, 0x0000000000000A00,
-      0x0000000000001400, 0x0000000000002800, 0x0000000000005000,
-      0x000000000000A000, 0x0000000000004000, 0x0000000000020000,
-      0x0000000000050000, 0x00000000000A0000, 0x0000000000140000,
-      0x0000000000280000, 0x0000000000500000, 0x0000000000A00000,
-      0x0000000000400000, 0x0000000002000000, 0x0000000005000000,
-      0x000000000A000000, 0x0000000014000000, 0x0000000028000000,
-      0x0000000050000000, 0x00000000A0000000, 0x0000000040000000,
-      0x0000000200000000, 0x0000000500000000, 0x0000000A00000000,
-      0x0000001400000000, 0x0000002800000000, 0x0000005000000000,
-      0x000000A000000000, 0x0000004000000000, 0x0000020000000000,
-      0x0000050000000000, 0x00000A0000000000, 0x0000140000000000,
-      0x0000280000000000, 0x0000500000000000, 0x0000A00000000000,
-      0x0000400000000000, 0x0002000000000000, 0x0005000000000000,
-      0x000A000000000000, 0x0014000000000000, 0x0028000000000000,
-      0x0050000000000000, 0x00A0000000000000, 0x0040000000000000,
-      0x0000000000000000, 0x0000000000000000, 0x0000000000000000,
-      0x0000000000000000, 0x0000000000000000, 0x0000000000000000,
-      0x0000000000000000, 0x0000000000000000, 0x0000000000000000,
-      0x0000000000000000, 0x0000000000000000, 0x0000000000000000,
-      0x0000000000000000, 0x0000000000000000, 0x0000000000000000,
-      0x0000000000000000]
+
+    a0 = [0] * 8
+
+    our_pawn_attacks = [2**9, 2**8 + 2**10, 2**9 + 2**11, 2**10 + 2**12, 2**11 + 2**13, 2**12 + 2**14, 2**13 + 2**15, 2**14]
+    for row in range(1, 7) :
+      [our_pawn_attacks.append(v) for v in [our_pawn_attacks[i] << 8*row for i in range(8)]]
+
+    self.pawn_attacks = np.concatenate([our_pawn_attacks, a0], axis=0)
 
     pawn_atk_tbl = [2**1, 2**0 + 2**2, 2**1 + 2**3, 2**2 + 2**4, 2**3 + 2**5, 2**4 + 2**6, 2**5 + 2**7, 2**6]
 
@@ -49,7 +37,6 @@ class IndexedPawnAttacks :
         [pawn_atk_tbl.append(v) for v in [pawn_atk_tbl[i] << 8*row for i in range(8)]]
 
     pawn_atk_tbl = np.array(pawn_atk_tbl)
-    a0 = [0]*8
 
     pawn_atk_tbl = np.concatenate([a0, pawn_atk_tbl], axis=0)
     self.pawn_attacks_rev = [np.uint64(v) for v in pawn_atk_tbl]
@@ -87,7 +74,7 @@ class IndexedKnightAttacks :
     0x0044280000000000, 0x0088500000000000, 0x0010A00000000000,
     0x0020400000000000]
 
-    self.knight_attacks = [np.uint64(v) for v in self.knight_attacks] #convert entries to np.uint64
+    self.knight_attacks = [np.uint64(v) for v in self.knight_attacks]  # convert entries to np.uint64
 
   def __getitem__(self, idx):
     assert idx >= 0 and idx < 64
@@ -151,6 +138,7 @@ class BishopMagicBitboard :
       5, 5, 5, 5, 5, 5, 5, 5,
       6, 5, 5, 5, 5, 5, 5, 6,
     ]
+
     self.mask = [np.uint64(v) for v in self.mask]  # convert entries to np.uint64
     self.magic_numbers = [np.uint64(v) for v in self.magic_numbers]  # convert entries to np.uint64
     self.shifts = [np.uint64(v) for v in self.shifts]  # convert entries to np.uint64
@@ -217,8 +205,8 @@ class RookMagicBitboard :
 
 class SlidingAttackTables :
   def __init__(self):
-    self.r_attacktables = np.zeros(shape=(110000), dtype=np.uint64)
-    self.b_attacktables = np.zeros(shape=(6000), dtype=np.uint64)
+    self.r_attacktables = np.zeros(shape=(102400), dtype=np.uint64)
+    self.b_attacktables = np.zeros(shape=(5248), dtype=np.uint64)
     self.r_offsets = []
     self.b_offsets = []
     self.r_magic = RookMagicBitboard()
@@ -227,31 +215,33 @@ class SlidingAttackTables :
     self.rook_init = False
     self.bishops_init = False
 
-  def query_rook_attacks(self, square, occ = np.uint64(0)):
+    self._np_64 = np.uint64(64)
+
+  def query_rook_attacks(self, square, occ):
     assert self.rook_init
 
-    blocker_uint64 = occ & self.r_magic.mask[int(square)]
+    blocker_uint64 = occ & self.r_magic.mask[square ]
 
-    blocker_uint64 *= np.uint64(self.r_magic.magic_numbers[square])
+    blocker_uint64 *= self.r_magic.magic_numbers[square]
 
-    blocker_uint64 >>= np.uint64(64) - self.r_magic.shifts[square]
+    blocker_uint64 >>= self._np_64 - self.r_magic.shifts[square]
 
-    offset = int(self.r_offsets[square])
+    offset = self.r_offsets[square]
 
     n_idx = int(offset + blocker_uint64)
 
     return self.r_attacktables[n_idx]
 
-  def query_bishop_attacks(self, square, occ = np.uint64(0)):
+  def query_bishop_attacks(self, square, occ ):
     assert self.bishops_init
 
     blocker_uint64 = occ & self.b_magic.mask[square]
 
     blocker_uint64 *= self.b_magic.magic_numbers[square]
 
-    blocker_uint64 >>= np.uint64(64) - self.b_magic.shifts[square]
+    blocker_uint64 >>= self._np_64 - self.b_magic.shifts[square]
 
-    offset = int(self.b_offsets[square])
+    offset = self.b_offsets[square]
 
     n_idx = int(offset + blocker_uint64)
 
@@ -268,40 +258,46 @@ class SlidingAttackTables :
   # 3. Move the offset 2^Shifts for that square insertions (example, combinations for rook on a1 is 2^12 or something, move offset 2^12
 
   #rooks = False then fill bishop attack
-  def init_sliding_attacks(self, rooks = True):
+  def init_sliding_attacks(self, rooks = True) :
     cb = ChessBoard()
     nr_filled = 0
+
     directions = [[1, 0], [0, -1], [-1, 0], [0, 1]] if rooks else \
-      [[1,1],[1,-1],[-1,1],[-1,-1]]
+      [[1, 1], [1, -1], [-1, 1], [-1, -1]]
 
     on_board = lambda row, col: row >= 0 and row < 8 and col >= 0 and col < 8
     offset = 0
 
+    _np_one           = np.uint64(1)
+    _np_zero          = np.uint64(0)
+    _np_64            = np.uint64(64)
+    _occupation_mask  = np.uint64(0)
+    _sq_to_bb         = np.uint64(0)
+
     magic_board = RookMagicBitboard() if rooks else BishopMagicBitboard()
 
-    _square = Square(0)
-    for i in range(64):
-      _square.set(i)
+    for s_idx in range(64):
 
-      if rooks :
-        self.r_offsets.append(offset)
-      else :
-        self.b_offsets.append(offset)
+      if rooks:
+        self.r_offsets.append(int(offset))
+      else:
+        self.b_offsets.append(int(offset))
 
-      BB_indices = cb.get_pieces_idx_from_uint(magic_board.mask[_square.as_int()])
+      BB_indices = cb.get_pieces_idx_from_uint(magic_board.mask[s_idx])
 
       for i in range(0, 1 << len(BB_indices)):
-        occupation_mask = np.uint64(0)
+        s_64 = np.uint64(i)
 
-        #(lc0 algorithm), this gets all combinations of blockers, i have a recursive solution for this , this one is weird to understand
-        for k in range(0, len(BB_indices)) :
-          if (np.uint64(1) << np.uint64(k)) & np.uint64(i) : occupation_mask |= np.uint64(1) << np.uint64(BB_indices[k])
+        occupation_mask = _np_zero
 
-        # now for this blocker board, calculate the legit move , the value we finally will be mapped
-        # with this blockerboard
-        sq_to_bb = np.uint64(0)
+        for k in range(0, len(BB_indices)):
+          if _idx_64[k] & s_64:
+            occupation_mask |= _idx_64[BB_indices[k]]
+
+        _sq_to_bb = _np_zero
+
         for rdir in directions:
-          row, col = _square.row, _square.col
+          row, col = s_idx//8, s_idx % 8
 
           while True:
             row += rdir[1]
@@ -309,90 +305,40 @@ class SlidingAttackTables :
 
             if not on_board(row, col): break
 
-            ns = Square(row_col_to_idx(row, col)).as_uint64()
+            ns = _idx_64[row*8 + col]
 
-            sq_to_bb |= ns
+            _sq_to_bb |= ns
 
-            if (ns & occupation_mask) != 0: break
+            if ns & occupation_mask : break
 
         # generate hash key and insert
+        # we overflow here , somehow doesnt happen in c. i cant figure out how to deal with the problem
+        # so i hope to avoid it when i translate this to c later
 
-        #we overflow here , somehow doesnt happen in c. i cant figure out how to deal with the problem
-        #so i hope to avoid it when i translate this to c later
-        occupation_mask *= magic_board.magic_numbers[_square.as_int()]
+        occupation_mask *= magic_board.magic_numbers[s_idx]
+        occupation_mask >>= _np_64 - magic_board.shifts[s_idx]
 
-        occupation_mask >>= np.uint64(64) - magic_board.shifts[_square.as_int()]
-
-        if occupation_mask > 2 ** (magic_board.shifts[_square.as_int()]):
-          print("sanity check gone wrong, probably wrong in offset algorithm", occupation_mask, )
+        # if occupation_mask > 2 ** (magic_board.shifts[s_idx]):
+        #   print("sanity check gone wrong, probably wrong in offset algorithm", occupation_mask, "square id :", s_idx,
+        #         "offset : ", offset)
 
         n_idx = int(offset + occupation_mask)
 
         if rooks:
-          self.r_attacktables[n_idx] = sq_to_bb
+          self.r_attacktables[n_idx] = _sq_to_bb
         else:
-          self.b_attacktables[n_idx] = sq_to_bb
+          self.b_attacktables[n_idx] = _sq_to_bb
 
         nr_filled += 1
 
-        # move the offset
-      offset += 2 ** (magic_board.shifts[_square.as_int()])
+      # move the offset
+      offset += 2 ** (magic_board.shifts[s_idx])
 
     print("{} attack tables initialized. inserted {} attack configs".format('rooks' if rooks else 'bishops', nr_filled))
-    if rooks : self.rook_init = True
-    else : self.bishops_init = True
 
-#old solution, new solution doesnt seem faster
-
-# all_blockerboard_combs = CombinationSolver.get_combinations(BB_indices)
-      # all_blockerboard_combs.append([]) #add the board where all blocker squares are free
-      #
-      # #exchange blocker_board with a range loop from 0 to
-      # for blocker_board in all_blockerboard_combs:
-      #
-      #   blocker_uint64 = np.uint64(0)
-      #
-      #   for bv in blocker_board:
-      #     blocker_uint64 |= np.uint64(1) << np.uint64(bv)
-      #
-      #   # now for this blocker board, calculate the legit move , the value we finally will be mapped
-      #   # with this blockerboard
-      #   sq_to_bb = np.uint64(0)
-      #   for rdir in directions:
-      #     row, col = _square.row, _square.col
-      #
-      #     while True:
-      #       row += rdir[1]
-      #       col += rdir[0]
-      #
-      #       if not on_board(row, col) : break
-      #
-      #       ns = Square(row_col_to_idx(row, col)).as_uint64()
-      #
-      #       sq_to_bb |= ns
-      #
-      #       if (ns & blocker_uint64) != 0: break
-      #
-      #   #generate hash key and insert
-      #   blocker_uint64 &= magic_board.mask[_square.as_int()]  # unneccessary?
-      #
-      #   blocker_uint64 *= magic_board.magic_numbers[int(_square.as_int())]
-      #
-      #   blocker_uint64 >>= np.uint64(64) - magic_board.shifts[_square.as_int()]
-      #
-      #   if blocker_uint64 > 2 ** (magic_board.shifts[_square.as_int()]):
-      #     print("sanity check gone wrong, probably wrong in offset algorithm", blocker_uint64, )
-      #
-      #   n_idx = int(offset + blocker_uint64)
-      #
-      #   if rooks :
-      #     self.r_attacktables[n_idx] = sq_to_bb
-      #   else :
-      #     self.b_attacktables[n_idx] = sq_to_bb
-      #
-      #   nr_filled += 1
-      #
-      # # move the offset
-      # offset += 2 ** (magic_board.shifts[_square.as_int()])
+    if rooks:
+      self.rook_init = True
+    else:
+      self.bishops_init = True
 
 

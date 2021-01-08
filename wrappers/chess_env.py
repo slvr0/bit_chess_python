@@ -42,11 +42,9 @@ class ChessEnvironment :
       reward = 1
       terminal = True
 
-    board_pos_value = self.cb.get_all_pieces() | self.cb.get_all_pieces(False)
-
     to_act = True if self.cb.white_to_act else False
 
-    return status, reward, to_act, board_pos_value, terminal, repeats
+    return status, reward, to_act, terminal, repeats
 
   #this doesnt change the environment but gives info on how the environment would change if action was taken
   def explore(self, action) :
