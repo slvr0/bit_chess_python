@@ -21,12 +21,11 @@ class ChessMove :
       'Q': 'Queen',
       'K': 'King'
     }
-    # if not white_toact:
-    #   bn = board_notations[::-1]
-    # else:
-    #   bn = board_notations
+    if not white_toact:
+      bn = board_notations[::-1]
+    else:
+      bn = board_notations
 
-    bn = board_notations
     print('------------------------ Chessmoves in position ------------------------')
     print("Move : ", p_translation[self.ptype], " from : ", bn[self._from], " to : ",
           bn[self.to], " special info : ", self.spec_action)

@@ -170,7 +170,7 @@ class MoveGenerator :
     capture_mask = _np_zero #attack squares where
     pins = [] #attack squares where pieces cannot move, now a tuple (at, from)
 
-    enemy_king_moves = self.get_kingmoves(enemy_king_idx) & ~occ
+    enemy_king_moves = self.get_kingmoves(enemy_king_idx)
 
     attacking_mask |= enemy_king_moves
     attacking_mask_noking |= enemy_king_moves
@@ -274,8 +274,6 @@ class MoveGenerator :
 
     all_moves = ChessMoveList()
 
-    t0 = time()
-
     attackinfo = self.get_enemy_attackinfo(cb)
 
     self.n_checkers = attackinfo['n_checkers']
@@ -291,12 +289,16 @@ class MoveGenerator :
 
     self.king_square = cb.get_pieces_idx('K')[0]
     self.enemy_king_64 = cb.pieces['k']
-    king_moves = self.get_kingmoves(self.king_square)
-
-    t1 = time()
+    legal_king_moves = self.get_kingmoves(self.king_square)
 
     #bug, the king can capture anywhere on the board if he's under check
-    legal_king_moves = king_moves & (~self.attack_mask_noking & ~self.our_pieces & (~self.enemy_pieces & ~self.attack_mask))
+    #legal_king_moves = king_moves & (~self.attack_mask_noking & ~self.our_pieces & ~self.attack_mask)
+
+    legal_king_moves &= ~self.our_pieces
+    legal_king_moves &= ~self.attack_mask_noking
+    legal_king_moves &= ~self.enemy_king_64
+    #finally remove movement to protected enemy pieces
+    legal_king_moves &= ~(self.attack_mask_noking & self.enemy_pieces)
 
     m_idc = cb.get_pieces_idx_from_uint(legal_king_moves)
 
@@ -306,8 +308,6 @@ class MoveGenerator :
       return all_moves #there's no other options
 
     self.king_in_check = True if self.n_checkers >= 1 else False
-
-    t2 = time()
 
     p_idcs = cb.get_pieces_idx('P')
     self.append_pawnmoves(all_moves, p_idcs)
@@ -335,12 +335,6 @@ class MoveGenerator :
         if csq_00_64 & self.occ == 0 and csq_00_64 &  self.attack_mask  == 0 : all_moves.add_move(ChessMove(4, 6, 'K', 'O-O'))
       if cb.castling.we_000() :
         if csq_000_64 & self.occ == 0 and csq_000_64 & self.attack_mask == 0 : all_moves.add_move(ChessMove(4, 2, 'K', 'O-O-O'))
-
-    t3 = time()
-
-    self.dt0 += t1 - t0
-    self.dt1 += t2 - t1
-    self.dt2 += t3 - t2
 
     return all_moves
 

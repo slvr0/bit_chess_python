@@ -144,10 +144,10 @@ class ChessBoard :
     self.pieces['q'] = our_queens
     self.pieces['k'] = our_kings
 
-    all = self.our_pieces | self.enemy_pieces
+    #all = self.our_pieces | self.enemy_pieces
 
-    self.our_pieces = enemy_pawns | enemy_knights | enemy_bishops | enemy_rooks | enemy_kings
-    self.enemy_pieces = our_pawns | our_knights | our_bishops | our_rooks | our_kings
+    self.our_pieces = enemy_pawns | enemy_knights | enemy_bishops | enemy_rooks | enemy_queens | enemy_kings
+    self.enemy_pieces = our_pawns | our_knights | our_bishops | our_rooks | our_queens | our_kings
 
     self.castling.mirror()
 

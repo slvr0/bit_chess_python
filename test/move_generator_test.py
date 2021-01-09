@@ -97,8 +97,152 @@ def run_move_generator_test(move_gen) :
   except:
     print("error in test 6 , output : {} , correct : {}".format(len(moves), n_moves_correct))
 
+  #sp9 = 'r3r1n1/n1pp4/6p1/1p1bpp1p/1q3P2/NP4P1/PRPPP2P/2QK1BNR'
+  #cb9 = ChessBoard(fen_position=sp9)
+  # moves = move_gen.generate_legal_moves(cb9)
+  # moves.print()
 
+  #extensive king testing
 
+  sp_0 = '3r1k2/8/8/5n2/3K4/4P3/8/8 w - - 0 1'
+  sp_1 = '6r1/1k6/1p6/K7/8/8/8/8 w - - 0 1'
+  sp_2 = '8/4kq2/8/8/8/8/4n3/5Kr1 w - - 0 1'
+  sp_3 = 'k7/8/7b/8/5n2/8/3r1p2/3K4 w - - 0 1'
+  sp_4 = '4b3/3K4/2n1p3/5q2/8/8/8/7k w - - 0 1'
+  sp_5 = '8/5q2/3r2pK/8/8/8/8/7k w - - 0 1'
+
+  sp_6 = '8/8/4k3/3n4/3p4/3Kb3/1NNQ4/8 w - - 0 1'
+  sp_7 = '5K2/4nnn1/4nnn1/5k2/8/8/8/8 w - - 0 1'
+  sp_8 = '8/8/8/PP6/Pk4PP/5nPP/6PP/2K1qr2 w - - 0 1'
+  sp_9 = '5k2/8/3P4/3Knq2/2b5/8/8/8 w - - 0 1'
+  sp_10 = 'b7/1b1k4/2b5/3b4/4b3/5R2/6b1/7K w - - 0 1'
+
+  cb = ChessBoard(fen_position=sp_0)
+  moves = move_gen.generate_legal_moves(cb)
+
+  sp_0_c = 5
+  n_moves = len(moves)
+  try :
+    IS_EQ(n_moves, sp_0_c)
+  except:
+    print("error in test kingtest 0 , output : {} , correct : {}".format(n_moves, sp_0_c))
+    moves.print()
+
+  cb = ChessBoard(fen_position=sp_1)
+  moves = move_gen.generate_legal_moves(cb)
+
+  sp_1_c = 3
+  n_moves = len(moves)
+  try:
+    IS_EQ(n_moves, sp_1_c)
+  except:
+    print("error in test kingtest 1 , output : {} , correct : {}".format(n_moves, sp_1_c))
+    moves.print()
+
+  cb = ChessBoard(fen_position=sp_2)
+  moves = move_gen.generate_legal_moves(cb)
+
+  sp_2_c = 1
+  n_moves = len(moves)
+  try:
+    IS_EQ(n_moves, sp_2_c)
+  except:
+    print("error in test kingtest 2 , output : {} , correct : {}".format(n_moves, sp_2_c))
+    moves.print()
+
+  cb = ChessBoard(fen_position=sp_3)
+  moves = move_gen.generate_legal_moves(cb)
+
+  sp_3_c = 2
+  n_moves = len(moves)
+  try:
+    IS_EQ(n_moves, sp_3_c)
+  except:
+    print("error in test kingtest 3 , output : {} , correct : {}".format(n_moves, sp_3_c))
+    moves.print()
+
+  cb = ChessBoard(fen_position=sp_4)
+  moves = move_gen.generate_legal_moves(cb)
+
+  sp_4_c = 4
+  n_moves = len(moves)
+  try:
+    IS_EQ(n_moves, sp_4_c)
+  except:
+    print("error in test kingtest 4 , output : {} , correct : {}".format(n_moves, sp_4_c))
+    moves.print()
+
+  cb = ChessBoard(fen_position=sp_5)
+  moves = move_gen.generate_legal_moves(cb)
+
+  sp_5_c = 1
+  n_moves = len(moves)
+  try:
+    IS_EQ(n_moves, sp_5_c)
+  except:
+    print("error in test kingtest 5 , output : {} , correct : {}".format(n_moves, sp_5_c))
+    moves.print()
+
+  cb = ChessBoard(fen_position=sp_6)
+  moves = move_gen.generate_legal_moves(cb)
+
+  sp_6_c = 11 + 6 + 3 + 3
+  n_moves = len(moves)
+  try:
+    IS_EQ(n_moves, sp_6_c)
+  except:
+    print("error in test kingtest 6 , output : {} , correct : {}".format(n_moves, sp_6_c))
+    moves.print()
+
+  cb = ChessBoard(fen_position=sp_7)
+  moves = move_gen.generate_legal_moves(cb)
+
+  sp_7_c = 1
+  n_moves = len(moves)
+  try:
+    IS_EQ(n_moves, sp_7_c)
+  except:
+    print("error in test kingtest 7 , output : {} , correct : {}".format(n_moves, sp_7_c))
+    moves.print()
+
+  cb = ChessBoard(fen_position=sp_8)
+  moves = move_gen.generate_legal_moves(cb)
+
+  sp_8_c = 2
+  n_moves = len(moves)
+  try:
+    IS_EQ(n_moves, sp_8_c)
+  except:
+    print("error in test kingtest 8 , output : {} , correct : {}".format(n_moves, sp_8_c))
+    moves.print()
+
+  cb = ChessBoard(fen_position=sp_9)
+  moves = move_gen.generate_legal_moves(cb)
+
+  sp_9_c = 2
+  n_moves = len(moves)
+  try:
+    IS_EQ(n_moves, sp_9_c)
+  except:
+    print("error in test kingtest 9 , output : {} , correct : {}".format(n_moves, sp_9_c))
+    moves.print()
+
+  cb = ChessBoard(fen_position=sp_10)
+  moves = move_gen.generate_legal_moves(cb)
+
+  sp_10_c = 3
+  n_moves = len(moves)
+  try:
+    IS_EQ(n_moves, sp_10_c)
+  except:
+    print("error in test kingtest 10 , output : {} , correct : {}".format(n_moves, sp_10_c))
+    moves.print()
+
+  #debug positions from mcts errors
+  sp_debug_mcts_0 = 'rn4nr/pp5p/3kpppp/3P4/PPp5/4PBP1/3P1PbP/1NKR3R w K - 0 1'
+  cb = ChessBoard(sp_debug_mcts_0)
+  moves = move_gen.generate_legal_moves(cb)
+  moves.print()
 
 
 

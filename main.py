@@ -37,13 +37,18 @@ from time import time
 import numpy as np
 import ctypes
 from core.chess_square import idx_to_row_col
+from copy import deepcopy
+
+from test.mcts_test import run_mcts_test
 
 if __name__ == '__main__':
 
-
-
     move_gen = MoveGenerator()
-    _run_tests(move_gen)
+    run_mcts_test(move_gen)
+    #_run_tests(move_gen)
+
+    #move_gen = MoveGenerator()
+    #_run_tests(move_gen)
     #run_test()
 
     #run_move_generator_test(move_gen)

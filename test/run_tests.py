@@ -15,4 +15,4 @@ def _run_tests(move_gen) :
   #run_board_tests()
   #run_attack_tables_test(move_gen)
   run_move_generator_test(move_gen)
-  test.random_chessplay_test.run_test(move_gen)
+  #test.random_chessplay_test.run_test(move_gen)

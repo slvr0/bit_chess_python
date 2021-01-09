@@ -20,15 +20,15 @@ def dummy_debug(white_toact, actions, random_move, cb_before, cb_after):
 
 def run_test(move_generator) :
 
-  cb = ChessBoard()
-
   standard_position = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+  cb = ChessBoard(standard_position)
 
-  chessboard = ChessBoard(standard_position)
-  chess_environment = ChessEnvironment(move_generator, chessboard)
+  cb0 = deepcopy(cb)
+
+  chess_environment = ChessEnvironment(move_generator)
 
   max_moves = 100
-  games     = 250
+  games     = 2500
   found_endgame = False
 
   t0 = time()
@@ -39,8 +39,11 @@ def run_test(move_generator) :
   nr_moves_analyzed = 0
 
   for game in range(games) :
+
+    cb = chess_environment.reset_from(cb, cb0)
+
     t_r_0 = time()
-    chess_environment.reset()
+
     reset_time += time() - t_r_0
 
     to_act = 1
@@ -51,38 +54,37 @@ def run_test(move_generator) :
     cb_after = None
 
     for i in range(max_moves) :
+      try :
+        l_action_time = time()
+        actions = chess_environment.get_legal_moves(cb)
+        getting_legal_action_time += time() - l_action_time
 
-      l_action_time = time()
-
-      actions = chess_environment.get_legalmoves_inpos()
-      # try :
-      #
-      # except :
-      #   print("Failed to catch new moves")
-      #   dummy_debug(to_act, actions, r_move, cb_before, cb_after)
-
-      getting_legal_action_time += time() - l_action_time
+      except :
+        print("Failed to catch new moves")
+        dummy_debug(to_act, actions, r_move, cb_before, cb_after)
 
       nr_moves_analyzed += len(actions)
 
       info_time = time()
-      status, reward, white_toact, terminal, repeats = chess_environment.get_env_info()
+      status, reward, white_toact, terminal, repeats = chess_environment.get_board_info(cb, actions)
       getting_env_info += time() - info_time
 
       if terminal :
+        #cb.print_console()
         # print("Game over!", "result : ", status ,"actions available for current player:" , len(actions), "who acts? : ", ['black',
         #                              'white'][white_toact] ,  ', moves repeated : ', repeats)
-        chess_environment.reset()
+        cb = chess_environment.reset_from(cb, cb0)
         break
 
       random_move = np.random.randint(len(actions))
-      cb_before = deepcopy(chess_environment.cb)
-      cb_after = deepcopy(chess_environment.explore(random_move))
+
+      cb_before = deepcopy(cb)
+      cb_after = deepcopy(chess_environment.explore(cb, actions, random_move))
       to_act = white_toact
       r_move = random_move
 
       time_stepping = time()
-      chess_environment.step(random_move)
+      chess_environment.step(cb, actions, random_move)
       step_time += time() - time_stepping
 
 
@@ -91,7 +93,7 @@ def run_test(move_generator) :
   print("actions per second : " ,  int(nr_moves_analyzed / getting_legal_action_time))
 
 
-  print("time info ", move_generator.dt0, move_generator.dt1, move_generator.dt2)
+  #print("time info ", move_generator.dt0, move_generator.dt1, move_generator.dt2)
 
 
 
