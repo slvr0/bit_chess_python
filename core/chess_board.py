@@ -1,6 +1,6 @@
 
 # scrapboard structure
-# board consist of a uint64_t for each piece type, the ones represent position of each piece
+# board consist of a for each piece type, the ones represent position of each piece
 # ex. our_pawns, our_knights, our_bishops, our_rooks, our_queens, our_king
 # and enemy_pawns, etc...
 
@@ -33,8 +33,6 @@ class ChessBoard :
   #calling reset from doesn't reposition from fen string rather from the input chessboard pieces, which is much faster
   def reset_from(self, cb):
 
-    self.pieces = deepcopy(cb.pieces)
-
     self.our_pieces = cb.our_pieces
     self.enemy_pieces = cb.enemy_pieces
 
@@ -47,22 +45,8 @@ class ChessBoard :
     self.fen = cb.fen
 
   def reset(self):
-    self.pieces = {
 
-      'P': np.uint64(0),
-      'N': np.uint64(0),
-      'B': np.uint64(0),
-      'R': np.uint64(0),
-      'Q': np.uint64(0),
-      'K': np.uint64(0),
-
-      'p': np.uint64(0),
-      'n': np.uint64(0),
-      'b': np.uint64(0),
-      'r': np.uint64(0),
-      'q': np.uint64(0),
-      'k': np.uint64(0)
-    }
+    _np_zero = np.uint64(0x0)
 
     self.white_to_act = True
 
@@ -72,34 +56,48 @@ class ChessBoard :
 
     self.castling.reset()
 
-    self.our_pieces = _np_zero
-    self.enemy_pieces = _np_zero
+    self.pawns_ = _np_zero
+    self.bishops_ = _np_zero
+    self.knights_ = _np_zero
+    self.rooks_ = _np_zero
+    self.queens_ = _np_zero
+    self.king_ = _np_zero
+
+    self.enemy_pawns_ = _np_zero
+    self.enemy_bishops_ = _np_zero
+    self.enemy_knights_ = _np_zero
+    self.enemy_rooks_ = _np_zero
+    self.enemy_queens_ = _np_zero
+    self.enemy_king_ = _np_zero
+
+    # try this out, scrap the godamn dictionary
+    self.our_pieces_ = self.pawns_ | self.knights_ | self.bishops_ | self.rooks_ | self.queens_ | self.king_
+    self.enemy_pieces_ = self.enemy_pawns_ | self.enemy_knights_ | self.enemy_bishops_ | self.enemy_rooks_ | self.enemy_queens_ | self.enemy_king_
+    self.occ = self.our_pieces_ | self.enemy_pieces_
 
     if self.fen != "": self.read_from_fen(fen_position=self.fen)
 
   def __init__(self, fen_position = "") :
+    _np_zero = np.uint64(0x0)
 
-    self.pieces = {
-    'P': np.uint64(0),
-    'N': np.uint64(0),
-    'B': np.uint64(0),
-    'R': np.uint64(0),
-    'Q': np.uint64(0),
-    'K': np.uint64(0),
+    self.pawns_ = _np_zero
+    self.bishops_= _np_zero
+    self.knights_= _np_zero
+    self.rooks_= _np_zero
+    self.queens_= _np_zero
+    self.king_= _np_zero
 
-    'p' : np.uint64(0),
-    'n' : np.uint64(0),
-    'b' : np.uint64(0),
-    'r' : np.uint64(0),
-    'q' : np.uint64(0),
-    'k' : np.uint64(0)
-    }
+    self.enemy_pawns_= _np_zero
+    self.enemy_bishops_= _np_zero
+    self.enemy_knights_= _np_zero
+    self.enemy_rooks_= _np_zero
+    self.enemy_queens_= _np_zero
+    self.enemy_king_= _np_zero
 
-    self.our_pieces = self.pieces['P'] | self.pieces['N'] | self.pieces['B'] | self.pieces['R'] | self.pieces['Q'] | self.pieces['K']
-    self.enemy_pieces = self.pieces['p'] | self.pieces['n'] | self.pieces['b'] | self.pieces['r'] | self.pieces['q'] | \
-                      self.pieces['k']
-
-    self.all_pieces = self.get_board()
+    #try this out, scrap the godamn dictionary
+    self.our_pieces_ = self.pawns_ | self.knights_ | self.bishops_ | self.rooks_ | self.queens_ | self.king_
+    self.enemy_pieces_ = self.enemy_pawns_ | self.enemy_knights_ | self.enemy_bishops_ | self.enemy_rooks_ | self.enemy_queens_ | self.enemy_king_
+    self.occ = self.our_pieces_ | self.enemy_pieces_  
 
     self.white_to_act = True
 
@@ -116,38 +114,38 @@ class ChessBoard :
 
     self.white_to_act = False if self.white_to_act else True
 
-    our_pawns = flip_horizontal(flip_vertical(self.pieces['P']))
-    our_knights = flip_horizontal(flip_vertical(self.pieces['N']))
-    our_bishops = flip_horizontal(flip_vertical(self.pieces['B']))
-    our_rooks = flip_horizontal(flip_vertical(self.pieces['R']))
-    our_queens = flip_horizontal(flip_vertical(self.pieces['Q']))
-    our_kings = flip_horizontal(flip_vertical(self.pieces['K']))
+    our_pawns = flip_horizontal(flip_vertical(self.pawns_))
+    our_knights = flip_horizontal(flip_vertical(self.knights_))
+    our_bishops = flip_horizontal(flip_vertical(self.bishops_))
+    our_rooks = flip_horizontal(flip_vertical(self.rooks_))
+    our_queens = flip_horizontal(flip_vertical(self.queens_))
+    our_kings = flip_horizontal(flip_vertical(self.king_))
 
-    enemy_pawns = flip_horizontal(flip_vertical(self.pieces['p']))
-    enemy_knights = flip_horizontal(flip_vertical(self.pieces['n']))
-    enemy_bishops = flip_horizontal(flip_vertical(self.pieces['b']))
-    enemy_rooks = flip_horizontal(flip_vertical(self.pieces['r']))
-    enemy_queens = flip_horizontal(flip_vertical(self.pieces['q']))
-    enemy_kings = flip_horizontal(flip_vertical(self.pieces['k']))
+    enemy_pawns = flip_horizontal(flip_vertical(self.enemy_pawns_))
+    enemy_knights = flip_horizontal(flip_vertical(self.enemy_knights_))
+    enemy_bishops = flip_horizontal(flip_vertical(self.enemy_bishops_))
+    enemy_rooks = flip_horizontal(flip_vertical(self.enemy_rooks_))
+    enemy_queens = flip_horizontal(flip_vertical(self.enemy_queens_))
+    enemy_kings = flip_horizontal(flip_vertical(self.enemy_king_))
 
-    self.pieces['P'] = enemy_pawns
-    self.pieces['N'] = enemy_knights
-    self.pieces['B'] = enemy_bishops
-    self.pieces['R'] = enemy_rooks
-    self.pieces['Q'] = enemy_queens
-    self.pieces['K'] = enemy_kings
+    self.pawns_ = enemy_pawns
+    self.knights_ = enemy_knights
+    self.bishops_ = enemy_bishops
+    self.rooks_ = enemy_rooks
+    self.queens_ = enemy_queens
+    self.king_ = enemy_kings
 
-    self.pieces['p'] = our_pawns
-    self.pieces['n'] = our_knights
-    self.pieces['b'] = our_bishops
-    self.pieces['r'] = our_rooks
-    self.pieces['q'] = our_queens
-    self.pieces['k'] = our_kings
+    self.enemy_pawns_ = our_pawns
+    self.enemy_knights_ = our_knights
+    self.enemy_bishops_ = our_bishops
+    self.enemy_rooks_ = our_rooks
+    self.enemy_queens_ = our_queens
+    self.enemy_king_ = our_kings
 
-    #all = self.our_pieces | self.enemy_pieces
+    self.our_pieces = self.pawns_ | self.knights_ | self.bishops_ | self.rooks_ | self.queens_ | self.king_
+    self.enemy_pieces = self.enemy_pawns_ | self.enemy_knights_ | self.enemy_bishops_ | self.enemy_rooks_ | self.enemy_queens_ | self.enemy_king_
 
-    self.our_pieces = enemy_pawns | enemy_knights | enemy_bishops | enemy_rooks | enemy_queens | enemy_kings
-    self.enemy_pieces = our_pawns | our_knights | our_bishops | our_rooks | our_queens | our_kings
+    self.occ = self.our_pieces | self.enemy_pieces
 
     self.castling.mirror()
 
@@ -158,7 +156,7 @@ class ChessBoard :
       if self.pieces[k] & Square(square).as_uint64() != 0 : return k
 
   def get_board(self):
-    return self.our_pieces | self.enemy_pieces
+    return self.our_pieces_ | self.enemy_pieces_
 
   def read_from_fen(self, fen_position):
     #read entry , count slashes for line division. have a counter for what square we are
@@ -226,6 +224,10 @@ class ChessBoard :
     self.move_count = int(rem_string[4])
     self._50_rulecount = int(rem_string[3])
 
+    self.our_pieces_ = self.pawns_ | self.knights_ | self.bishops_ | self.rooks_ | self.queens_ | self.king_
+    self.enemy_pieces_ = self.enemy_pawns_ | self.enemy_knights_ | self.enemy_bishops_ | self.enemy_rooks_ | self.enemy_queens_ | self.enemy_king_
+    self.occ = self.our_pieces_ | self.enemy_pieces_
+
   def square_occupied_by(self, square):
     for k in self.pieces :
       if self.pieces[k] & (np.uint64(1) << np.uint64(square)) != 0 : return k
@@ -241,28 +243,60 @@ class ChessBoard :
 
   def add_piece(self, at_idx, ptype = '') :
     #assert ptype in self.pieces.keys()
-    self.pieces[ptype] |= _idx_64[at_idx]
+
+    if ptype == 'P' : self.pawns_ |= _idx_64[at_idx]
+    elif ptype == 'B' : self.bishops_ |= _idx_64[at_idx]
+    elif ptype == 'N' : self.knights_ |= _idx_64[at_idx]
+    elif ptype == 'R' : self.rooks_ |= _idx_64[at_idx]
+    elif ptype == 'Q' : self.queens_ |= _idx_64[at_idx]
+    elif ptype == 'K' : self.king_ |= _idx_64[at_idx]
+    elif ptype == 'p' : self.enemy_pawns_ |= _idx_64[at_idx]
+    elif ptype == 'b' : self.enemy_bishops_ |= _idx_64[at_idx]
+    elif ptype == 'n' : self.enemy_knights_ |= _idx_64[at_idx]
+    elif ptype == 'r' : self.enemy_rooks_ |= _idx_64[at_idx]
+    elif ptype == 'q' : self.enemy_queens_ |= _idx_64[at_idx]
+    elif ptype == 'k' : self.enemy_king_ |= _idx_64[at_idx]
+
 
     if ptype.isupper() :
-      self.our_pieces |= _idx_64[at_idx]
+      self.our_pieces_ |= _idx_64[at_idx]
     else :
-      self.enemy_pieces |= _idx_64[at_idx]
+      self.enemy_pieces_ |= _idx_64[at_idx]
 
   def remove_piece(self, at_idx):
-    occ_type = ''
-    sq_64 = _idx_64[at_idx]
-    sq_64_inv = ~sq_64
 
-    for k in self.pieces :
-      self.pieces[k] &= sq_64_inv
-      if self.pieces[k] & sq_64 :
-        occ_type = k
-        break
+    s_64_idx = _idx_64[at_idx]
+    self.pawns_ &= ~s_64_idx
+    self.bishops_ &= ~s_64_idx
+    self.knights_ &= ~s_64_idx
+    self.rooks_ &= ~s_64_idx
+    self.queens_ &= ~s_64_idx
+    self.king_ &= ~s_64_idx
+    self.enemy_pawns_ &= ~s_64_idx
+    self.enemy_bishops_ &= ~s_64_idx
+    self.enemy_knights_ &= ~s_64_idx
+    self.enemy_rooks_ &= ~s_64_idx
+    self.enemy_queens_ &= ~s_64_idx
+    self.enemy_king_ &= ~s_64_idx
 
-    if occ_type.isupper() :
-      self.our_pieces &= ~_idx_64[at_idx]
-    else :
-      self.enemy_pieces &= ~_idx_64[at_idx]
+    self.our_pieces_ &= ~s_64_idx
+    self.enemy_pieces_ &= ~s_64_idx
+    self.occ &= ~s_64_idx
+
+    # occ_type = ''
+    # sq_64 = _idx_64[at_idx]
+    # sq_64_inv = ~sq_64
+    #
+    # for k in self.pieces :
+    #   self.pieces[k] &= sq_64_inv
+    #   if self.pieces[k] & sq_64 :
+    #     occ_type = k
+    #     break
+    #
+    # if occ_type.isupper() :
+    #   self.our_pieces &= ~_idx_64[at_idx]
+    # else :
+    #   self.enemy_pieces &= ~_idx_64[at_idx]
 
   def update_from_move(self, move):
 
@@ -314,21 +348,35 @@ class ChessBoard :
     self.castling.update_castlestatus(chessmove=move)
 
   @staticmethod
-  def get_pieces_idx_from_uint(pieces_uint64):
-    if pieces_uint64 == 0 : return []
+  def get_pieces_idx_from_uint(pieces_uint64, num_bits = 64):
 
-    pieces_as_bin = bin(pieces_uint64)[::-1][:-2]
+    return [num_bits - idx - 1 for idx, c in enumerate(format(pieces_uint64, f'0{num_bits}b')) if c == '1']
 
-    return [idx.start() for idx in re.finditer('1', pieces_as_bin)]
+    # if pieces_uint64 == 0 : return []
+    #
+    # pieces_as_bin = bin(pieces_uint64)[::-1][:-2]
+    #
+    # return [idx.start() for idx in re.finditer('1', pieces_as_bin)]
 
-  def get_pieces_idx(self, ptype = ''):
-    assert ptype in self.pieces.keys()
 
-    pieces_uint64 = self.pieces[ptype]
+  def get_pieces_idx(self, ptype = '', num_bits = 64):
 
-    pieces_as_bin = bin(pieces_uint64)[::-1][:-2]
+    if   ptype == 'P' : pieces_uint64 = self.pawns_
+    elif ptype == 'B' : pieces_uint64 = self.bishops_
+    elif ptype == 'N' : pieces_uint64 = self.knights_
+    elif ptype == 'R' : pieces_uint64 = self.rooks_
+    elif ptype == 'Q' : pieces_uint64 = self.queens_
+    elif ptype == 'K' : pieces_uint64 = self.king_
+    elif ptype == 'p' : pieces_uint64 = self.enemy_pawns_
+    elif ptype == 'b' : pieces_uint64 = self.enemy_bishops_
+    elif ptype == 'n' : pieces_uint64 = self.enemy_knights_
+    elif ptype == 'r' : pieces_uint64 = self.enemy_rooks_
+    elif ptype == 'q' : pieces_uint64 = self.enemy_queens_
+    elif ptype == 'k' : pieces_uint64 = self.enemy_king_
+    else : return []
 
-    return [idx.start() for idx in re.finditer('1', pieces_as_bin)]
+    return [num_bits - idx - 1 for idx, c in enumerate(format(pieces_uint64, f'0{num_bits}b')) if c == '1']
+
 
   def fill_printer(self, print_mode, spec_type =''):
     printer = np.chararray(shape=(64,))

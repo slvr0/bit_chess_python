@@ -35,9 +35,6 @@ class MoveGenerator :
     self.dt1 = 0
     self.dt2 = 0
 
-  def reset_board(self):
-    self.cb = None
-
   def get_kingmoves(self, square):
     moves = _np_zero
 
@@ -56,20 +53,330 @@ class MoveGenerator :
 
     return moves
 
+  #start from king, send out rays in all directions
+  #collects push,pin,capture and n_attacks
+  def get_push_pin(self, king, our_pieces, enemy_pieces, enemy_bishops, enemy_rooks, enemy_queens):
+
+    t0 = time()
+
+    m_dirs = ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1))
+    on_board = lambda row, col : row >= 0 and row < 8 and col >= 0 and col < 8
+
+    np_zeromask = np.uint64(0x0)
+
+    push_mask_full = np.uint64(0x0)
+    push_mask_dir  = np.uint64(0x0)
+    capture_mask = np.uint64(0x0)
+
+    n_attackers = 0
+    pins = []
+
+    r_qs = enemy_queens|enemy_rooks
+    b_qs = enemy_queens|enemy_bishops
+
+    is_bishop_queen = lambda c_idx_64 : c_idx_64 & b_qs
+    is_rook_queen = lambda c_idx_64 : c_idx_64 & r_qs
+
+    for direction in m_dirs :
+      validate_bishop_queens = direction[0] != 0 and direction[1] != 0
+
+      row, col = idx_to_row_col(king)
+
+      push_mask_full |= push_mask_dir
+      push_mask_dir &= np_zeromask
+
+      pin_at = -1
+      found_pin = False
+
+      while True :
+        row += direction[1]
+        col += direction[0]
+
+        if not on_board(row, col) :
+          push_mask_dir &= np_zeromask
+          break
+
+        s_id = row_col_to_idx(row, col)
+        n_sq_64 = _idx_64[s_id]
+
+        # we need to make sure we are pinned/attacked by correct piecetype
+        if n_sq_64 & enemy_pieces :
+
+          if validate_bishop_queens and is_bishop_queen(n_sq_64) :
+            found_true = True
+          elif not validate_bishop_queens and is_rook_queen(n_sq_64):
+            found_true = True
+          else : found_true = False
+
+          if not found_true :
+            push_mask_dir &= np_zeromask
+            break
+
+          if found_pin :
+            push_mask_dir |= _idx_64[row_col_to_idx(row, col)]
+            pins.append((pin_at, push_mask_dir))
+            push_mask_dir &= np_zeromask
+            break
+          else :
+            capture_mask |= n_sq_64
+            n_attackers += 1
+            break
+
+        push_mask_dir |= _idx_64[row_col_to_idx(row, col)]
+
+        if n_sq_64 & our_pieces :
+          push_mask_dir &= np_zeromask
+          if found_pin : break #means we encountered 2 of our own pieces on ray == no pin
+
+          found_pin = True
+          pin_at = s_id
+
+    self.dt0 += time() - t0
+
+    return n_attackers, push_mask_full, capture_mask, pins
+
+  #new attempt at a faster move generator
+  def get_legal_moves(self, cb):
+    movelist = ChessMoveList()
+
+    #go through all squares. check every piece alternative.
+    #append enemy attack squares, attacksquares wo king, capture squares and push squares
+    #as well as king info, under attack etc
+
+    t0 = time()
+    attack_mask = np.uint64(0x0) #all enemy attack squares
+    attack_mask_noking = np.uint64(0x0) #all enemy attack squares where our king is removed
+
+    our_pieces = cb.our_pieces_
+    enemy_pieces = cb.enemy_pieces_
+    occ = our_pieces | enemy_pieces
+    king = cb.king_
+    enemy_king = cb.enemy_king_
+    king_idx = -1
+    knight_capture_mask = np.uint64(0x0)
+
+    n_pawn_attackers = 0
+
+    self.dt0 += time() - t0
+
+    found_king = False
+
+    for square in cb.get_pieces_idx_from_uint(occ) :
+      t2 = time ()
+      idx_64 = _idx_64[square]
+
+      if idx_64 & cb.king_ :
+        print("found king!")
+        found_king = True
+        
+        king_moves = self.get_kingmoves(square)
+        king_idx = square
+        n_attackers, push_mask, capture_mask, pins \
+          = self.get_push_pin(square, our_pieces, enemy_pieces, cb.enemy_bishops_, cb.enemy_rooks_, cb.enemy_queens_)
+        self.dt2 += time()-t2
+
+      elif idx_64 & cb.pawns_ :
+        t2 = time()
+        self.append_pseudo_pawnmoves(cb, square, movelist)
+        self.dt2 += time() - t2
+
+      elif idx_64 & cb.knights_ :
+        t2 = time()
+        self.append_pseudomove_general(cb, square, movelist, 'N')
+        self.dt2 += time() - t2
+
+      elif idx_64 & cb.bishops_ :
+        t2 = time()
+        self.append_pseudomove_general(cb, square, movelist, 'B')
+        self.dt2 += time() - t2
+
+      elif idx_64 & cb.rooks_ :
+        t2 = time()
+        self.append_pseudomove_general(cb, square, movelist, 'R')
+        self.dt2 += time() - t2
+
+      elif idx_64 & cb.queens_ :
+        t2 = time()
+        self.append_pseudomove_general(cb, square, movelist, 'Q')
+        self.dt2 += time() - t2
+
+      elif idx_64 & cb.enemy_pawns_:
+        t1 = time()
+        attacks = self.pawn_attacks.pawn_attacks_rev[square]
+        if attacks & king : n_pawn_attackers += 1
+        attack_mask |= attacks
+        attack_mask_noking |= attacks
+        self.dt1 += time() - t1
+
+      elif idx_64 & cb.enemy_knights_:
+        t1 = time()
+        attacks = self.knight_attacks[square]
+        attack_mask |= attacks
+        attack_mask_noking |= attacks
+        self.dt1 += time() - t1
+
+        if attacks & king :
+          knight_capture_mask |= idx_64
+
+      elif idx_64 & cb.enemy_bishops_:
+        t1 = time()
+        attacks = self.sliding_attacktables.query_bishop_attacks(square, occ)
+        attacks_noking = self.sliding_attacktables.query_bishop_attacks(square, occ - king)
+        attack_mask |= attacks
+        attack_mask_noking |= attacks_noking
+        self.dt1 += time() - t1
+
+      elif idx_64 & cb.enemy_rooks_:
+        t1 = time()
+        attacks = self.sliding_attacktables.query_rook_attacks(square, occ)
+        attacks_noking = self.sliding_attacktables.query_rook_attacks(square, occ - king)
+        attack_mask |= attacks
+        attack_mask_noking |= attacks_noking
+        self.dt1 += time() - t1
+
+      elif idx_64 & cb.enemy_queens_:
+        t1 = time()
+        attacks = self.sliding_attacktables.query_rook_attacks(square, occ)  | self.sliding_attacktables.query_bishop_attacks(square, occ)
+        attacks_noking = self.sliding_attacktables.query_rook_attacks(square, occ - king) | self.sliding_attacktables.query_bishop_attacks(square, occ - king)
+        attack_mask |= attacks
+        attack_mask_noking |= attacks_noking
+        self.dt1 += time() - t1
+
+      elif idx_64 & cb.enemy_king_:
+        t1 = time()
+        attacks = self.get_kingmoves(square)
+        attack_mask |= attacks
+        attack_mask_noking |= attacks
+        self.dt1 += time() - t1
+
+    #if we don't acquire n_attackers and masks at this point, means we dont have a king and a serious bug in the algorithm somewhere
+    #check legality of moves
+    if not found_king  :
+      print("KING ERROR !")
+      cb.print_console()
+
+      raise Exception("Didn't find our king, chessboard(king) {}: ".format(king))
+
+    n_attackers += n_pawn_attackers
+    capture_mask |= knight_capture_mask
+
+    #legal king moves
+    king_moves &= ~our_pieces
+    king_moves &= ~attack_mask_noking
+    king_moves &= ~enemy_king
+    # finally remove movement to protected enemy pieces
+    king_moves &= ~(attack_mask_noking & enemy_pieces)
+
+    k_move_idcs = cb.get_pieces_idx_from_uint(king_moves)
+
+    legal_movelist = ChessMoveList()
+
+    for k_move_idx in k_move_idcs: legal_movelist.add_move(ChessMove(king_idx, k_move_idx, ptype='K'))
+
+    if n_attackers > 1 : return legal_movelist
+
+    #add legal moves, special cases for pins and when king is in check
+    for index, move in enumerate(movelist) :
+      _from = move._from
+      _to = move.to
+      _to_64 = _idx_64[_to]
+
+      is_pinned = False
+      pinned_index = -1
+      for index, pin in enumerate(pins):
+        if _from == pin[0]:
+          is_pinned = True
+          pinned_index = index
+          break
+
+      if n_attackers == 1  and _to_64 & (push_mask | capture_mask) and not is_pinned:
+        legal_movelist.add_move(move)
+        continue
+
+      elif is_pinned and _idx_64[_to] & pins[pinned_index][1]:
+        legal_movelist.add_move(move)
+        continue
+
+      elif not is_pinned and n_attackers == 0 :
+        legal_movelist.add_move(move)
+
+    if n_attackers == 0 :
+      csq_00_64 = _idx_64[5] | _idx_64[6]
+      csq_000_64 = _idx_64[2] | _idx_64[3]
+
+      # we're able to castle, there's nothing there and there's nothing attacking connected castle squares. its then legal
+      if cb.castling.we_00():
+        if csq_00_64 & occ == 0 and csq_00_64 & attack_mask == 0: legal_movelist.add_move(
+          ChessMove(4, 6, 'K', 'O-O'))
+      if cb.castling.we_000():
+        if csq_000_64 & occ == 0 and csq_000_64 & attack_mask == 0: legal_movelist.add_move(
+          ChessMove(4, 2, 'K', 'O-O-O'))
+
+    return legal_movelist
+
+  def append_pseudomove_general(self, cb, square, movelist, ptype=''):
+    ptype = ptype
+
+    if ptype == 'N' : atc_64 = self.knight_attacks[square] & ~(cb.our_pieces_ | cb.enemy_king_)
+    elif ptype == 'B' : atc_64 = \
+      self.sliding_attacktables.query_bishop_attacks(square, cb.our_pieces_ | cb.enemy_pieces_) \
+      & ~(cb.our_pieces_ | cb.enemy_king_)
+    elif ptype == 'R' : atc_64 = \
+      self.sliding_attacktables.query_rook_attacks(square, cb.our_pieces_ | cb.enemy_pieces_) \
+      & ~(cb.our_pieces_ | cb.enemy_king_)
+    elif ptype == 'Q' :
+      r = self.sliding_attacktables.query_rook_attacks(square, cb.our_pieces_ | cb.enemy_pieces_) \
+                   & ~(cb.our_pieces_ | cb.enemy_king_)
+      b = self.sliding_attacktables.query_bishop_attacks(square, cb.our_pieces_ | cb.enemy_pieces_) \
+          & ~(cb.our_pieces_ | cb.enemy_king_)
+      atc_64 = r | b
+
+    else  : return
+
+    atc_idcs = cb.get_pieces_idx_from_uint(atc_64)
+    [movelist.add_move(ChessMove(_from=square, to=idx, ptype=ptype)) for idx in atc_idcs]
+
+  def append_pseudo_pawnmoves(self, cb, square, movelist):
+    one_move = 8
+    two_move = 16
+    ptype = 'P'
+    enp_sq = cb.enpassant_sq
+
+    p_atc_64 = self.pawn_attacks[square] & ~cb.enemy_king_
+    p_sq_idcs = cb.get_pieces_idx_from_uint(p_atc_64)
+
+    for a_sq in p_sq_idcs :
+      if enp_sq == a_sq :
+        if self.spec_enp_legalcheck(cb, a_sq):
+            movelist.add_move(ChessMove(square, a_sq, ptype=ptype, spec_action='enp'))
+
+      elif _idx_64[a_sq] & cb.enemy_pieces_ != 0 :
+        movelist.add_move(ChessMove(square, a_sq, ptype=ptype))
+
+    if _idx_64[square + one_move] & cb.occ == 0:
+      movelist.add_move(ChessMove(square, square + one_move, ptype=ptype))
+
+    if square >= 8 and square <= 15 :
+      if _idx_64[square + two_move] & cb.occ == 0 and \
+              _idx_64[square + one_move] & cb.occ == 0: movelist.add_move(
+        ChessMove(square, square + two_move, ptype=ptype))
+
   #this function covers the tricky horizontal discover check from enp captures, example here
   #https://lichess.org/analysis/8/4p3/8/2KP3q/8/1k6/8/8_b_-_-_0_1#2
-  def spec_enp_legalcheck(self, capt_from):
+  def spec_enp_legalcheck(self, cb, capt_from):
+
     #check if rook/queen on rank
     row, col = idx_to_row_col(capt_from)
 
     full_row = np.uint8(0xFF)
     full_row_idx = np.uint64(full_row << (row - 1) * 8)
 
-    kings = self.cb.pieces['k']
-    queens = self.cb.pieces['q']
-    our_king = self.cb.pieces['K']
+    enemy_queens = cb.enemy_queens_
+    enemy_rooks  = cb.enemy_rooks_
+    king = cb.king_
 
-    if (kings | queens) & full_row_idx == 0 : return True
+    if (king | (enemy_rooks | enemy_queens)) & full_row_idx == 0 : return True
+
     else :
       lost_piece_sq = self.cb.enpassant_sq - 8
 
@@ -77,418 +384,8 @@ class MoveGenerator :
       cap_lost_64 = _idx_64[lost_piece_sq]
 
       #get all attacks rays without the enp pieces
-      all_atc_idc = self.cb.get_pieces_idx_from_uint(kings | queens)
-      occ_no_enp_pieces = (self.cb.our_pieces | self.cb.enemy_pieces) & ~(cap_64 | cap_lost_64)
+      all_atc_idc = self.cb.get_pieces_idx_from_uint(enemy_rooks | enemy_queens)
+      occ_no_enp_pieces = (cb.our_pieces_ | cb.enemy_pieces_) & ~(cap_64 | cap_lost_64)
       for a_idx in all_atc_idc :
         attacks = self.sliding_attacktables.query_rook_attacks(a_idx, occ_no_enp_pieces)
-        if attacks & our_king != 0 : return False
-
-    #bug, what if enemy own piece cover rays
-  def calc_pushmoves(self, our_pieces, enemy_pieces, ksq, attacker_sq, attacker_type):
-    if attacker_type == 'r':
-      m_dirs = ((1, 0), (-1, 0), (0, 1), (0, -1))
-    elif attacker_type == 'b':
-      m_dirs = ((1, 1), (1, -1), (-1, 1), (-1, -1))
-    elif attacker_type == 'q':
-      m_dirs = ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1))
-    else:
-      return ()
-
-    attack_mask = _np_zero
-
-    pin_at = -1
-    pin_attackray = _np_zero
-
-    for mdir in m_dirs:
-      row, col = idx_to_row_col(attacker_sq)
-
-      found_ray = False
-      found_pin = False
-
-      no_pin = False #if block by own piece
-
-      pin_attackray |= _idx_64[attacker_sq]
-
-      while True :
-        row += mdir[1]
-        col += mdir[0]
-
-        if row <  0 or row > 7 or col <  0 or col > 7  : break
-
-        new_idx = row_col_to_idx(row, col)
-
-        if new_idx == ksq:
-          found_ray = True
-          break
-
-        n_sq_64 = _idx_64[new_idx]
-
-        if n_sq_64 & enemy_pieces != 0 : no_pin = True
-
-        if our_pieces & n_sq_64 != 0 and not found_pin and not no_pin :
-          found_pin = True
-          pin_at = new_idx
-
-        attack_mask |= n_sq_64
-        pin_attackray |= n_sq_64
-
-      if found_ray:
-        break
-      else:
-        attack_mask = _np_zero
-        pin_at = -1
-        pin_attackray = _np_zero
-
-    return attack_mask, (pin_at, pin_attackray)
-
-  def get_enemy_attackinfo(self, cb ):
-    king_pos = cb.pieces['K']
-
-    king_idx = cb.get_pieces_idx_from_uint(king_pos)[0]
-
-    enemy_pawns = cb.pieces['p']
-    enemy_knights = cb.pieces['n']
-    enemy_bishops = cb.pieces['b']
-    enemy_queens = cb.pieces['q']
-    enemy_rooks = cb.pieces['r']
-
-    enemy_king_pos = cb.pieces['k']
-
-    enemy_king_idx = cb.get_pieces_idx_from_uint(enemy_king_pos)[0]
-
-    our_pieces = cb.our_pieces
-    enemy_pieces = cb.enemy_pieces
-
-    occ = our_pieces | enemy_pieces
-    occ_no_king = occ - king_pos
-
-    n_checkers = 0
-    attacking_mask = _np_zero # all enemy attack squares, covering castle and similar
-    attacking_mask_noking = _np_zero # same but with no king, need this to calculate correct king moves out of check
-
-    push_mask = _np_zero #attack squares between slider and king
-    capture_mask = _np_zero #attack squares where
-    pins = [] #attack squares where pieces cannot move, now a tuple (at, from)
-
-    enemy_king_moves = self.get_kingmoves(enemy_king_idx)
-
-    attacking_mask |= enemy_king_moves
-    attacking_mask_noking |= enemy_king_moves
-
-    knight_attacking_king = False
-
-    #pawns
-    p_idcs = cb.get_pieces_idx_from_uint(enemy_pawns)
-    for p_idx in p_idcs :
-      attacks = self.pawn_attacks.pawn_attacks_rev[p_idx]
-      attacking_mask |= attacks
-      attacking_mask_noking |= attacks
-      if attacks & king_pos != 0:
-        n_checkers += 1
-        capture_mask |= _np_one << np.uint64(p_idx)
-
-    #knights
-    kn_idcs = cb.get_pieces_idx_from_uint(enemy_knights)
-    for kn_idx in kn_idcs :
-      attacks = self.knight_attacks[kn_idx]
-      attacking_mask |= attacks
-      attacking_mask_noking |= attacks
-      if attacks & king_pos != 0 :
-        n_checkers += 1
-        knight_attacking_king = True
-        capture_mask |= _np_one << np.uint64(kn_idx)
-
-    #bishops
-    b_idcs = cb.get_pieces_idx_from_uint(enemy_bishops)
-    for b_idx in b_idcs:
-      attacks = self.sliding_attacktables.query_bishop_attacks(b_idx, occ)
-      attacks_noking = self.sliding_attacktables.query_bishop_attacks(b_idx, occ_no_king)
-      attacking_mask |= attacks
-      attacking_mask_noking |= attacks_noking
-
-      if self.sliding_attacktables.query_bishop_attacks(b_idx, _np_zero) & king_pos != 0 :
-        push, pin = self.calc_pushmoves(our_pieces, enemy_pieces, king_idx, b_idx, 'b')  # where we can block
-        pins.append(pin)
-        if attacks & king_pos != 0:
-          n_checkers += 1
-          push_mask |= push
-          capture_mask |= _np_one << np.uint64(b_idx)
-
-    #rooks
-    r_idcs = cb.get_pieces_idx_from_uint(enemy_rooks)
-    for r_idx in r_idcs:
-      attacks = self.sliding_attacktables.query_rook_attacks(r_idx, occ)
-      attacks_noking = self.sliding_attacktables.query_rook_attacks(r_idx, occ_no_king)
-      attacking_mask |= attacks
-      attacking_mask_noking |= attacks_noking
-
-      if self.sliding_attacktables.query_rook_attacks(r_idx, _np_zero) & king_pos != 0:
-        push, pin = self.calc_pushmoves(our_pieces, enemy_pieces, king_idx, r_idx, 'r')  # where we can block
-        pins.append(pin)
-        if attacks & king_pos != 0:
-          n_checkers += 1
-          push_mask |= push
-          capture_mask |= _np_one << np.uint64(r_idx)
-
-    #queens
-    q_idcs = cb.get_pieces_idx_from_uint(enemy_queens)
-    for q_idx in q_idcs:
-      attacks = self.sliding_attacktables.query_rook_attacks(q_idx, occ)
-      attacks |= self.sliding_attacktables.query_bishop_attacks(q_idx, occ)
-
-      attacks_noking = self.sliding_attacktables.query_rook_attacks(q_idx, occ_no_king)
-      attacks_noking |= self.sliding_attacktables.query_bishop_attacks(q_idx, occ_no_king)
-
-      attacking_mask |= attacks
-      attacking_mask_noking |= attacks_noking
-
-      if (self.sliding_attacktables.query_bishop_attacks(q_idx, _np_zero) & king_pos != 0) or \
-         (self.sliding_attacktables.query_rook_attacks(q_idx, _np_zero) & king_pos != 0) :
-        push, pin = self.calc_pushmoves(our_pieces, enemy_pieces, king_idx, q_idx, 'q')  # where we can block
-        pins.append(pin)
-        if attacks & king_pos != 0:
-          n_checkers += 1
-          push_mask |= push
-          capture_mask |= _np_one << np.uint64(q_idx)
-
-    if knight_attacking_king :
-      push_mask = _np_zero
-
-    return {
-    'n_checkers' : n_checkers,
-    'attack_mask' : attacking_mask,
-    'attack_mask_noking' :attacking_mask_noking,
-    'push_mask' : push_mask,
-    'capture_mask': capture_mask,
-    'pins' : pins
-    }
-
-  def generate_legal_moves(self, cb):
-
-    if self.cb is not None :
-      self.reset_board()
-
-    self.cb = cb
-    self.our_pieces = self.cb.our_pieces
-    self.enemy_pieces = self.cb.enemy_pieces
-
-    all_moves = ChessMoveList()
-
-    attackinfo = self.get_enemy_attackinfo(cb)
-
-    self.n_checkers = attackinfo['n_checkers']
-    self.attack_mask = attackinfo['attack_mask']
-    self.attack_mask_noking = attackinfo['attack_mask_noking']
-    self.push_mask = attackinfo['push_mask']
-    self.capture_mask = attackinfo['capture_mask']
-    self.pins = attackinfo['pins']
-
-    self.our_pieces = cb.our_pieces
-    self.enemy_pieces = cb.enemy_pieces
-    self.occ = self.our_pieces | self.enemy_pieces
-
-    self.king_square = cb.get_pieces_idx('K')[0]
-    self.enemy_king_64 = cb.pieces['k']
-    legal_king_moves = self.get_kingmoves(self.king_square)
-
-    #bug, the king can capture anywhere on the board if he's under check
-    #legal_king_moves = king_moves & (~self.attack_mask_noking & ~self.our_pieces & ~self.attack_mask)
-
-    legal_king_moves &= ~self.our_pieces
-    legal_king_moves &= ~self.attack_mask_noking
-    legal_king_moves &= ~self.enemy_king_64
-    #finally remove movement to protected enemy pieces
-    legal_king_moves &= ~(self.attack_mask_noking & self.enemy_pieces)
-
-    m_idc = cb.get_pieces_idx_from_uint(legal_king_moves)
-
-    for k_move_idx in m_idc: all_moves.add_move(ChessMove(self.king_square, k_move_idx, ptype='K'))
-
-    if self.n_checkers >= 2 :
-      return all_moves #there's no other options
-
-    self.king_in_check = True if self.n_checkers >= 1 else False
-
-    p_idcs = cb.get_pieces_idx('P')
-    self.append_pawnmoves(all_moves, p_idcs)
-
-    kn_idcs = cb.get_pieces_idx('N')
-    self.append_knightmoves(all_moves, kn_idcs)
-
-    b_idcs = cb.get_pieces_idx('B')
-    self.append_slidermoves(chessmove_list=all_moves, piece_idcs=b_idcs, pt='B')
-
-    r_idcs = cb.get_pieces_idx('R')
-    self.append_slidermoves(chessmove_list=all_moves, piece_idcs=r_idcs, pt='R')
-
-    q_idcs = cb.get_pieces_idx('Q')
-    self.append_slidermoves(chessmove_list=all_moves, piece_idcs=q_idcs, pt='Q')
-
-    #castle moves
-    if not self.king_in_check :
-
-      csq_00_64  = _idx_64[5] | _idx_64[6]
-      csq_000_64 = _idx_64[2] | _idx_64[3]
-
-      #we're able to castle, there's nothing there and there's nothing attacking connected castle squares. its then legal
-      if cb.castling.we_00() :
-        if csq_00_64 & self.occ == 0 and csq_00_64 &  self.attack_mask  == 0 : all_moves.add_move(ChessMove(4, 6, 'K', 'O-O'))
-      if cb.castling.we_000() :
-        if csq_000_64 & self.occ == 0 and csq_000_64 & self.attack_mask == 0 : all_moves.add_move(ChessMove(4, 2, 'K', 'O-O-O'))
-
-    return all_moves
-
-  def get_slider_attacks(self, s_idx, ptype):
-    if ptype == 'Q' :
-      return self.sliding_attacktables.query_rook_attacks(s_idx, self.occ) | self.sliding_attacktables.query_bishop_attacks(s_idx, self.occ)
-    elif ptype == 'R' :
-      return self.sliding_attacktables.query_rook_attacks(s_idx, self.occ)
-    elif ptype == 'B' :
-      return self.sliding_attacktables.query_bishop_attacks(s_idx, self.occ)
-    else : return 0
-
-  def append_slidermoves(self, chessmove_list, piece_idcs, pt):
-    ptype = pt
-
-    for idx in piece_idcs :
-      idx_64 = _idx_64[idx]
-
-      attacks = self.get_slider_attacks(idx, ptype) & ~(self.our_pieces | self.enemy_king_64)
-
-      is_pinned = False
-
-      if self.king_in_check :
-        for pin in self.pins:
-          if _idx_64[pin[0]] & idx_64 != 0:
-            is_pinned = True
-
-        if is_pinned : continue
-
-        if self.capture_mask != 0 and attacks & self.capture_mask != 0: add_capture_mask = True
-        else : add_capture_mask = False
-
-        attacks &= self.push_mask
-
-        if add_capture_mask : attacks |= self.capture_mask
-
-        #there's probably a faster way for this method, check lc0
-        attack_idcs = self.cb.get_pieces_idx_from_uint(attacks)
-        [chessmove_list.add_move(ChessMove(_from=idx, to=n_idx, ptype=ptype)) for n_idx in attack_idcs]
-
-      else :
-        pin_index  = -1
-
-        for index, pin in enumerate(self.pins):
-          if _idx_64[pin[0]] & idx_64 != 0:
-            pin_index = index
-            is_pinned = True
-            break
-
-        if is_pinned :
-          _,_from_ray = self.pins[pin_index]
-          attacks &= _from_ray
-
-        attack_idcs = self.cb.get_pieces_idx_from_uint(attacks)
-        [chessmove_list.add_move(ChessMove(_from=idx, to=n_idx, ptype=ptype)) for n_idx in attack_idcs]
-
-  def append_knightmoves(self,chessmove_list, kn_idcs):
-    ptype = 'N'
-
-    for idx in kn_idcs :
-      is_pinned = False
-
-      idx_64 = _np_one << np.uint64(idx)
-
-      for pin in self.pins:
-        if (_np_one << np.uint64(pin[0])) & idx_64 != 0:
-          is_pinned = True
-
-      if is_pinned : continue
-
-      attacks = self.knight_attacks[idx] &  ~(self.our_pieces | self.enemy_king_64)
-
-      if self.king_in_check :
-        attacks = (self.push_mask & attacks) | (self.capture_mask & attacks)
-
-
-      attack_idcs = self.cb.get_pieces_idx_from_uint(attacks)
-      [chessmove_list.add_move(ChessMove(_from=idx, to=n_idx, ptype=ptype)) for n_idx in attack_idcs]
-
-  def append_pawnmoves(self, chessmove_list, p_idcs):
-      one_move = 8
-      two_move = 16
-
-      enp_sq = self.cb.enpassant_sq
-
-      ptype = 'P'
-
-      for idx in p_idcs:
-        idx_64 = _idx_64[idx]
-
-        n_sq_onemove = _np_zero if idx + 8 >= 64 else _idx_64[idx + 8]
-        n_sq_twomove = _np_zero if idx + 16 >= 64 else _idx_64[idx + 16]
-
-        is_pinned = False
-
-        if self.king_in_check :
-          for pin in self.pins :
-            if _idx_64[pin[0]] & idx_64 != 0 :
-              is_pinned = True
-
-          if is_pinned : continue
-
-          if n_sq_onemove & self.push_mask != 0 :
-
-            chessmove_list.add_move(ChessMove(idx, idx + one_move, ptype=ptype))
-          if n_sq_twomove & self.push_mask != 0 :
-            if idx <= 15:
-              if n_sq_twomove & self.occ == 0 and \
-                     n_sq_onemove & self.occ == 0:
-                chessmove_list.add_move(ChessMove(idx, idx + two_move, ptype=ptype))
-
-          attack_64 = self.pawn_attacks[idx]
-          a_sq_idx = self.cb.get_pieces_idx_from_uint(attack_64)
-          for a_sq in a_sq_idx :
-            if enp_sq == a_sq :
-              chessmove_list.add_move(ChessMove(idx, a_sq, ptype=ptype, spec_action='enp'))
-
-            elif _idx_64[a_sq] & self.capture_mask != 0 :
-              chessmove_list.add_move(ChessMove(idx, a_sq, ptype=ptype))
-
-          continue #dont add normal moves
-
-        pin_index  = -1
-
-        for index, pin in enumerate(self.pins):
-          if _idx_64[pin[0]] & idx_64 != 0:
-            pin_index = index
-            is_pinned = True
-            break
-
-        attack_64 = self.pawn_attacks[idx] & ~self.enemy_king_64
-
-        if is_pinned :
-          _, _from_ray = self.pins[pin_index]
-          attack_64 &= _from_ray
-
-        a_sq_idx = self.cb.get_pieces_idx_from_uint(attack_64)
-
-        for a_sq in a_sq_idx:
-          if enp_sq == a_sq:
-            if self.spec_enp_legalcheck(a_sq) :
-              chessmove_list.add_move(ChessMove(idx, a_sq, ptype=ptype, spec_action='enp'))
-
-          if _idx_64[a_sq] & self.enemy_pieces != 0:
-            chessmove_list.add_move(ChessMove(idx, a_sq, ptype=ptype))
-
-        if is_pinned : continue
-
-        # add all one moves
-        if n_sq_onemove & self.occ == 0:
-          chessmove_list.add_move(ChessMove(idx, idx + one_move, ptype=ptype))
-
-        # add all two moves
-        if idx <= 15 :
-          if n_sq_twomove & self.occ == 0 and \
-                  n_sq_onemove & self.occ == 0: chessmove_list.add_move(
-            ChessMove(idx, idx + two_move, ptype=ptype))
+        if attacks & king : return False

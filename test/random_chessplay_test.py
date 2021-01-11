@@ -7,7 +7,6 @@ import numpy as np
 from copy import deepcopy
 from time import time
 
-
 def dummy_debug(white_toact, actions, random_move, cb_before, cb_after):
   print("Player: ", ['black', 'white'][white_toact])
   actions[random_move].print(white_toact)
@@ -28,7 +27,7 @@ def run_test(move_generator) :
   chess_environment = ChessEnvironment(move_generator)
 
   max_moves = 100
-  games     = 2500
+  games     = 250000
   found_endgame = False
 
   t0 = time()
@@ -53,15 +52,18 @@ def run_test(move_generator) :
     cb_before = None
     cb_after = None
 
+    cb = cb0
+
     for i in range(max_moves) :
       try :
         l_action_time = time()
         actions = chess_environment.get_legal_moves(cb)
         getting_legal_action_time += time() - l_action_time
 
-      except :
-        print("Failed to catch new moves")
-        dummy_debug(to_act, actions, r_move, cb_before, cb_after)
+      except Exception as e:
+        print(e)
+
+        #dummy_debug(to_act, actions, r_move, cb_before, cb_after)
 
       nr_moves_analyzed += len(actions)
 
@@ -72,14 +74,13 @@ def run_test(move_generator) :
       if terminal :
         #cb.print_console()
         # print("Game over!", "result : ", status ,"actions available for current player:" , len(actions), "who acts? : ", ['black',
-        #                              'white'][white_toact] ,  ', moves repeated : ', repeats)
-        cb = chess_environment.reset_from(cb, cb0)
+
         break
 
       random_move = np.random.randint(len(actions))
 
-      cb_before = deepcopy(cb)
-      cb_after = deepcopy(chess_environment.explore(cb, actions, random_move))
+      cb_before = cb
+      cb_after = chess_environment.explore(cb, actions, random_move)
       to_act = white_toact
       r_move = random_move
 

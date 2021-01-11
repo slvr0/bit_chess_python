@@ -57,9 +57,13 @@ class ChessMoveList :
   def __getitem__(self, item):
     return self.moves[item]
 
+  def __iter__(self):
+    for each in self.moves :
+      yield each
+
   def add_move(self, move):
-    if move.ptype == 'P' and move.to >= 55 :
-      for i in range(4) : # i dont know how i want this
+    if move.ptype == 'P' and move.to >= 55 and move.spec_action == '' :
+      for i in range(4) : 
         promo_move = ChessMove(move._from, move.to, move.ptype, '=' + promo_types[i])
         promo_move.promotion = promo_types[i]
         self.moves.append(promo_move)
@@ -67,7 +71,7 @@ class ChessMoveList :
     else :
       self.moves.append(move)
 
-  def print(self, white_toact=True):
+  def print(self, white_toact=True) :
     p_translation = {
       'P': 'Pawn',
       'N': 'Knight',
