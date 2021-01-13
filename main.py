@@ -1,9 +1,6 @@
 
-
 ### IMPORTANT
 ### The focus on this code is to use test cases to satisify that all logic is working correct!
-
-
 
 # scrapboard structure
 # board consist of a uint64_t for each piece type, the ones represent position of each piece
@@ -42,10 +39,41 @@ from core.chess_board import ChessBoard
 
 from test.mcts_test import run_mcts_test
 from core.chess_square import _idx_64
+from wrappers.chess_env import ChessEnvironment
+
+import multiprocessing as mp
+
+import threading
+
+import numpy as np
+from nn.data_parser import NN_DataParser
 
 if __name__ == '__main__':
     move_gen = MoveGenerator()
-    _run_tests(move_gen)
+    nn_dp = NN_DataParser()
+
+    _run_tests(nn_dp, move_gen)
+    #run_mcts_test(move_gen)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

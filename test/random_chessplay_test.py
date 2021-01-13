@@ -20,15 +20,13 @@ def dummy_debug(white_toact, actions, random_move, cb_before, cb_after):
 def run_test(move_generator) :
 
   standard_position = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-  cb = ChessBoard(standard_position)
 
-  cb0 = deepcopy(cb)
+  cb0 = ChessBoard(standard_position)
 
   chess_environment = ChessEnvironment(move_generator)
 
   max_moves = 100
-  games     = 250000
-  found_endgame = False
+  games     = 5000
 
   t0 = time()
   reset_time = 0
@@ -39,55 +37,43 @@ def run_test(move_generator) :
 
   for game in range(games) :
 
-    cb = chess_environment.reset_from(cb, cb0)
-
     t_r_0 = time()
-
     reset_time += time() - t_r_0
 
-    to_act = 1
     actions = []
-    r_move = 0
-    board = None
-    cb_before = None
-    cb_after = None
 
-    cb = cb0
+    chess_environment.reset(cb0)
 
     for i in range(max_moves) :
+
       try :
         l_action_time = time()
-        actions = chess_environment.get_legal_moves(cb)
+        actions = chess_environment.get_legal_moves()
         getting_legal_action_time += time() - l_action_time
 
       except Exception as e:
         print(e)
-
         #dummy_debug(to_act, actions, r_move, cb_before, cb_after)
 
       nr_moves_analyzed += len(actions)
 
       info_time = time()
-      status, reward, white_toact, terminal, repeats = chess_environment.get_board_info(cb, actions)
+      status, reward, white_toact, terminal, repeats = chess_environment.get_board_info(actions)
       getting_env_info += time() - info_time
 
       if terminal :
         #cb.print_console()
-        # print("Game over!", "result : ", status ,"actions available for current player:" , len(actions), "who acts? : ", ['black',
-
         break
 
       random_move = np.random.randint(len(actions))
 
-      cb_before = cb
-      cb_after = chess_environment.explore(cb, actions, random_move)
-      to_act = white_toact
-      r_move = random_move
-
       time_stepping = time()
-      chess_environment.step(cb, actions, random_move)
+      chess_environment.step(actions, random_move)
       step_time += time() - time_stepping
 
+    #actions[random_move].print()
+    # print(i, status, reward, white_toact, terminal, repeats, len(actions))
+    # cb.print_console()
 
   print("total simul time : ", time() - t0, 'total time resetting: ',reset_time , ' time getting actions', getting_legal_action_time)
   print('getting env info', getting_env_info, 'stepping time' , step_time, "total moves found", nr_moves_analyzed)

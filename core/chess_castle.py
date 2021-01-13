@@ -18,7 +18,7 @@ class Castling :
 
     self.castle_info_serialized = np.uint16(0xFFFF)
 
-  def update_castlestatus(self, chessmove):
+  def update_castlestatus(self, chessmove, side = 1):
     pt = chessmove.ptype
     if pt == 'K' :
       self.set_we_00(False)
@@ -27,9 +27,12 @@ class Castling :
 
     if pt == 'R' :
       if chessmove._from == 0 :
-        self.set_we_000(False)
+        if side == 1 : self.set_we_000(False)
+        else : self.set_we_00(False)
+
       elif chessmove._from == 7 :
-        self.set_we_00(False)
+        if side == 1 : self.set_we_00(False)
+        else : self.set_we_000(False)
 
     if chessmove.to == 63 :
       self.set_enemy_00(False)

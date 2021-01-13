@@ -72,8 +72,8 @@ fl_v_np8 = np.uint64(8)
 fl_v_np16 = np.uint64(16)
 fl_v_np32 = np.uint64(32)
 
-def flip_vertical(v):
-  v = (v & fl_v_0) << fl_v_np32 | (v & fl_v_1) >> fl_v_np32
+def flip_vertical(x):
+  v = (x & fl_v_0) << fl_v_np32 | (x & fl_v_1) >> fl_v_np32
   v = (v & fl_v_2) << fl_v_np16 | (v & fl_v_3) >> fl_v_np16
   v = (v & fl_v_4) << fl_v_np8  | (v & fl_v_5) >> fl_v_np8
   return v
@@ -88,10 +88,10 @@ fl_h_np4 = np.uint64(4)
 
 def flip_horizontal(x):
 
-  x = ((x >> fl_h_np1) & k1) | ((x & k1) << fl_h_np1)
-  x = ((x >> fl_h_np2) & k2) | ((x & k2) << fl_h_np2)
-  x = ((x >> fl_h_np4) & k4) | ((x & k4) << fl_h_np4)
-  return x
+  v = ((x >> fl_h_np1) & k1) | ((x & k1) << fl_h_np1)
+  v = ((v >> fl_h_np2) & k2) | ((v & k2) << fl_h_np2)
+  v = ((v >> fl_h_np4) & k4) | ((v & k4) << fl_h_np4)
+  return v
 
 board_notations = \
 [ "A1","B1","C1","D1","E1","F1","G1","H1",
@@ -104,5 +104,10 @@ board_notations = \
   "A8","B8","C8","D8","E8","F8","G8","H8"]
 
 
+zobrish_prehash = np.zeros(shape=(64,12), dtype=np.uint64)
+
+for square in range(64) :
+  for ptype in range(12) :
+    zobrish_prehash[square,ptype] = np.uint64(np.random.randint(0, 2**63))
 
 

@@ -4,18 +4,8 @@
 from mcts.tree_node import MCTS_node
 from wrappers.chess_env import ChessEnvironment
 from copy import deepcopy
-
+from time import time
 import numpy as np
-
-def ndummydebug(white_toact, cb, from_action):
-  print("Player: ", ['black', 'white'][white_toact])
-  print("got here from action : ")
-  from_action.print()
-
-  print("Board before move: ")
-  cb.print_console()
-  print("Our pieces :")
-  cb.print_console(1)
 
 class MCTS_Search :
   def __init__(self, chess_env, root_node, rollout, max_depth = 5, max_entries = 50000):
@@ -30,117 +20,72 @@ class MCTS_Search :
   def print_action_chain(self):
     self.root_node.get_action_chain()
 
-  def initialize(self):
-    #start by simply expanding the root node to gain one depth options
-
-    actions = self.chess_env.get_legal_moves(self.root_node.cb)
-    self.nodes_at_depth[0] = 1
-
-    for action in range(len(actions)) :
-      new_cb = self.chess_env.explore(self.root_node.cb, actions, action)
-      status, reward, to_act, terminal, repeats = self.chess_env.get_board_info(new_cb, actions)
-      node = MCTS_node(1, deepcopy(new_cb), actions[action], reward, terminal, parent=self.root_node)
-      self.root_node.add_child(node)
-      self.nodes_at_depth[1] += 1
-
   def print_nodestruct(self):
     for depth,nnodes in enumerate(self.nodes_at_depth) :
       print("Depth : ", depth, " ...|... ", "Nodes", nnodes)
       if nnodes == 0 : break
 
-  def search(self):
+  def traverse_top_scores(self, node, n, f_out):
+    scores = node.get_childs_eval_score()
 
+    n_top = np.argpartition(scores, -n)[-n:]
+
+    for top_scorer in n_top :
+      if node.childs[top_scorer].is_leaf() :
+        action_chain = node.childs[top_scorer].cache_nn_res("")
+        f_out.write(action_chain)
+        f_out.write("\n")
+      else :
+        self.traverse_top_scores(node.childs[top_scorer], n, f_out)
+
+  def new_search(self):
     self.nodes_at_depth[0] = 1
-
     total_entries = 20
     total_rollouts = 0
 
-    current = self.root_node
-
-    start_as_white = current.cb.white_to_act
-
-    is_leaf = False
-    terminal_node = False
-
-    find_nonleaf_iters = 0
-    endscore = 0
+    f_out = open("mcts_out.txt", "w")
 
     while total_entries < self.max_entries :
 
-      is_leaf = current.is_leaf()
+      optimal_leaf_node = self.root_node.traverse_to_leaf()
 
-      while not is_leaf :
-        find_nonleaf_iters+=1
-        #set it to the best scoring child
-        child_scores = current.get_child_scores()
+      n_visits = optimal_leaf_node.n_visits
 
-        m_idx = np.argmax(child_scores)
-        current = current.childs[m_idx]
+      total_rollouts += 1
 
-        is_leaf = current.is_leaf()
+      action_chain = optimal_leaf_node.cache_nn_res("")
+      score = optimal_leaf_node.get_score()
+      f_out.write(action_chain + "(score({:.2f}))".format(score))
+      f_out.write("\n")
 
-      n_visits = current.n_visits
+      if n_visits == 0 :
+        optimal_leaf_node.rollout(self.chess_env, self.rollout)
+      else:
+        new_entries = optimal_leaf_node.expand(self.chess_env)
+        self.nodes_at_depth[optimal_leaf_node.depth + 1] += new_entries
+        total_entries += new_entries
 
-      if n_visits == 0  :
+        if optimal_leaf_node.is_leaf() : #means its terminal
+          optimal_leaf_node.terminal = True
+          continue
 
-        endscore, status = self.rollout.simulate_rollout(current)
+        optimal_leaf_node.childs[0].rollout(self.chess_env, self.rollout)
 
-        total_rollouts += 1
-        self.rollout.backward(current, endscore)
+    n = 4
 
-        current = self.root_node
-        current.cb = deepcopy(self.root_node.cb)
+    #collect result
 
-      else :
-        new_depth = current.depth + 1
+    f_out.write("\n")
+    f_out.write("Appending top action lines in tree")
+    f_out.write("\n")
 
-        try :
-          actions = self.chess_env.get_legal_moves(current.cb)
-        except Exception as e :
-          print("index error in search expansion")
-          print(e)
-          print("arrived from this board : ")
-          current.parent.cb.print_console()
-          current.from_action.print()
+    self.traverse_top_scores(self.root_node, n, f_out)
 
-        status, reward, to_act, terminal, repeats = self.chess_env.get_board_info(current.cb, actions)
-
-        for action in range(len(actions)):
-          total_entries += 1
-          new_cb = self.chess_env.step(current.cb, actions, action)
-          node = MCTS_node(new_depth, new_cb, actions[action], 0, terminal, parent=current)
-          current.add_child(node)
-
-          if new_depth >= self.max_depth  : break
-          self.nodes_at_depth[new_depth] += 1
-
-        if len(actions) == 0:
-          break
-
-        else :
-          current = current.childs[0]
-
-        total_rollouts += 1
-        endscore, status = self.rollout.simulate_rollout(current)
-
-        self.rollout.backward(current, endscore)
-
-        current = self.root_node
-        current.cb = deepcopy(self.root_node.cb)
-
-        continue
-
-    print("n iterations finding non leaf node : ", find_nonleaf_iters, "total rollouts : ", total_rollouts, "n entries : ", total_entries)
+    print("Total rollouts : ",total_rollouts, "Entries : ", total_entries, "rollout % : ", int(100 * total_rollouts / total_entries) ,
+          " Check file mcts_out.txt for output result")
     self.print_nodestruct()
 
-    #current = self.root_node
-    #current.cb = deepcopy(self.root_node.cb)
-
-    self.root_node.get_action_chain()
-
-
-
-
+    f_out.close()
 
 
 

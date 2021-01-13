@@ -10,7 +10,10 @@ class ChessMove :
     self.to = to
     self.ptype = ptype
     self.spec_action = spec_action
-    self.promotion = ''
+
+    if any(i in '=' for i in spec_action):
+      self.promotion = spec_action[-1]
+
 
   def print(self, white_toact=True):
     p_translation = {
@@ -29,6 +32,13 @@ class ChessMove :
     print('------------------------ Chessmoves in position ------------------------')
     print("Move : ", p_translation[self.ptype], " from : ", bn[self._from], " to : ",
           bn[self.to], " special info : ", self.spec_action)
+
+  def _str_dirty(self, white_toact=True):
+    if not white_toact:
+      bn = board_notations[::-1]
+    else:
+      bn = board_notations
+    return " " + self.ptype + bn[self._from] +  "->" + bn[self.to] + self.spec_action + " |"
 
   def _str(self, white_toact=True) :
     p_translation = {

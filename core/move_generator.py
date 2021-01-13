@@ -137,13 +137,13 @@ class MoveGenerator :
 
   #new attempt at a faster move generator
   def get_legal_moves(self, cb):
-    movelist = ChessMoveList()
-
-    #go through all squares. check every piece alternative.
-    #append enemy attack squares, attacksquares wo king, capture squares and push squares
-    #as well as king info, under attack etc
+    # go through all squares. check every piece alternative.
+    # append enemy attack squares, attacksquares wo king, capture squares and push squares
+    # as well as king info, under attack etc
 
     t0 = time()
+    movelist = ChessMoveList()
+
     attack_mask = np.uint64(0x0) #all enemy attack squares
     attack_mask_noking = np.uint64(0x0) #all enemy attack squares where our king is removed
 
@@ -166,9 +166,8 @@ class MoveGenerator :
       idx_64 = _idx_64[square]
 
       if idx_64 & cb.king_ :
-        print("found king!")
         found_king = True
-        
+
         king_moves = self.get_kingmoves(square)
         king_idx = square
         n_attackers, push_mask, capture_mask, pins \
@@ -221,7 +220,7 @@ class MoveGenerator :
       elif idx_64 & cb.enemy_bishops_:
         t1 = time()
         attacks = self.sliding_attacktables.query_bishop_attacks(square, occ)
-        attacks_noking = self.sliding_attacktables.query_bishop_attacks(square, occ - king)
+        attacks_noking = self.sliding_attacktables.query_bishop_attacks(square, occ & king)
         attack_mask |= attacks
         attack_mask_noking |= attacks_noking
         self.dt1 += time() - t1
@@ -229,7 +228,7 @@ class MoveGenerator :
       elif idx_64 & cb.enemy_rooks_:
         t1 = time()
         attacks = self.sliding_attacktables.query_rook_attacks(square, occ)
-        attacks_noking = self.sliding_attacktables.query_rook_attacks(square, occ - king)
+        attacks_noking = self.sliding_attacktables.query_rook_attacks(square, occ & king)
         attack_mask |= attacks
         attack_mask_noking |= attacks_noking
         self.dt1 += time() - t1
@@ -237,7 +236,7 @@ class MoveGenerator :
       elif idx_64 & cb.enemy_queens_:
         t1 = time()
         attacks = self.sliding_attacktables.query_rook_attacks(square, occ)  | self.sliding_attacktables.query_bishop_attacks(square, occ)
-        attacks_noking = self.sliding_attacktables.query_rook_attacks(square, occ - king) | self.sliding_attacktables.query_bishop_attacks(square, occ - king)
+        attacks_noking = self.sliding_attacktables.query_rook_attacks(square, occ & king) | self.sliding_attacktables.query_bishop_attacks(square, occ & king)
         attack_mask |= attacks
         attack_mask_noking |= attacks_noking
         self.dt1 += time() - t1
@@ -252,9 +251,6 @@ class MoveGenerator :
     #if we don't acquire n_attackers and masks at this point, means we dont have a king and a serious bug in the algorithm somewhere
     #check legality of moves
     if not found_king  :
-      print("KING ERROR !")
-      cb.print_console()
-
       raise Exception("Didn't find our king, chessboard(king) {}: ".format(king))
 
     n_attackers += n_pawn_attackers
@@ -301,16 +297,29 @@ class MoveGenerator :
         legal_movelist.add_move(move)
 
     if n_attackers == 0 :
-      csq_00_64 = _idx_64[5] | _idx_64[6]
-      csq_000_64 = _idx_64[2] | _idx_64[3]
+      w_csq_00_64 = _idx_64[5] | _idx_64[6]
+      w_csq_000_64 = _idx_64[2] | _idx_64[3]
+
+      b_csq_00_64 = _idx_64[1] | _idx_64[2]
+      b_csq_000_64 = _idx_64[4] | _idx_64[5]
 
       # we're able to castle, there's nothing there and there's nothing attacking connected castle squares. its then legal
-      if cb.castling.we_00():
-        if csq_00_64 & occ == 0 and csq_00_64 & attack_mask == 0: legal_movelist.add_move(
-          ChessMove(4, 6, 'K', 'O-O'))
-      if cb.castling.we_000():
-        if csq_000_64 & occ == 0 and csq_000_64 & attack_mask == 0: legal_movelist.add_move(
-          ChessMove(4, 2, 'K', 'O-O-O'))
+
+      if cb.white_to_act :
+        if cb.castling.we_00():
+          if (w_csq_00_64 | _idx_64[1]) & occ == 0 and w_csq_00_64 & attack_mask == 0: legal_movelist.add_move(
+            ChessMove(4, 6, 'K', 'O-O'))
+        if cb.castling.we_000():
+          if w_csq_000_64 & occ == 0 and w_csq_000_64 & attack_mask == 0: legal_movelist.add_move(
+            ChessMove(4, 2, 'K', 'O-O-O'))
+      else :
+        if cb.castling.we_00():
+          if b_csq_00_64 & occ == 0 and b_csq_00_64 & attack_mask == 0: legal_movelist.add_move(
+            ChessMove(3, 1, 'K', 'O-O'))
+        if cb.castling.we_000():
+          if (b_csq_000_64 | _idx_64[6]) & occ == 0 and b_csq_000_64 & attack_mask == 0: legal_movelist.add_move(
+            ChessMove(3, 5, 'K', 'O-O-O'))
+
 
     return legal_movelist
 
@@ -364,7 +373,6 @@ class MoveGenerator :
   #this function covers the tricky horizontal discover check from enp captures, example here
   #https://lichess.org/analysis/8/4p3/8/2KP3q/8/1k6/8/8_b_-_-_0_1#2
   def spec_enp_legalcheck(self, cb, capt_from):
-
     #check if rook/queen on rank
     row, col = idx_to_row_col(capt_from)
 
@@ -378,13 +386,13 @@ class MoveGenerator :
     if (king | (enemy_rooks | enemy_queens)) & full_row_idx == 0 : return True
 
     else :
-      lost_piece_sq = self.cb.enpassant_sq - 8
+      lost_piece_sq = cb.enpassant_sq - 8
 
       cap_64 = _idx_64[capt_from]
       cap_lost_64 = _idx_64[lost_piece_sq]
 
       #get all attacks rays without the enp pieces
-      all_atc_idc = self.cb.get_pieces_idx_from_uint(enemy_rooks | enemy_queens)
+      all_atc_idc = cb.get_pieces_idx_from_uint(enemy_rooks | enemy_queens)
       occ_no_enp_pieces = (cb.our_pieces_ | cb.enemy_pieces_) & ~(cap_64 | cap_lost_64)
       for a_idx in all_atc_idc :
         attacks = self.sliding_attacktables.query_rook_attacks(a_idx, occ_no_enp_pieces)
