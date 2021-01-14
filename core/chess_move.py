@@ -13,7 +13,7 @@ class ChessMove :
 
     if any(i in '=' for i in spec_action):
       self.promotion = spec_action[-1]
-
+    else : self.promotion = ''
 
   def print(self, white_toact=True):
     p_translation = {

@@ -44,14 +44,15 @@ class NN_DataParser :
 
     #score values
     branch_scores = np.zeros( shape=(len(node.childs)) )
-    branch_nn_indexes = np.zeros( shape=(len(node.childs)) )
+    branch_nn_indexes = np.zeros( shape=(len(node.childs)) ,dtype=np.int )
 
     for index, child in enumerate(node.childs) :
       branch_scores[index] = child.get_eval_score()
       branch_nn_indexes[index] = self.nn_move(child.from_action)
 
     #normalized_branch_scores
-    norm_branch_scores = np.linalg.norm(branch_scores)
+    norm = np.linalg.norm(branch_scores)
+    norm_branch_scores = branch_scores * norm
 
     return board_tensor, norm_branch_scores, branch_nn_indexes, terminal
 
