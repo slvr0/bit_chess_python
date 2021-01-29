@@ -46,6 +46,7 @@ class NN_DataParser :
     branch_scores = np.zeros( shape=(len(node.childs)) )
     branch_nn_indexes = np.zeros( shape=(len(node.childs)) ,dtype=np.int )
 
+
     for index, child in enumerate(node.childs) :
       branch_scores[index] = child.get_eval_score()
       branch_nn_indexes[index] = self.nn_move(child.from_action)

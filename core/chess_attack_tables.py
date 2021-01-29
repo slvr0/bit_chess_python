@@ -31,6 +31,8 @@ class IndexedPawnAttacks :
 
     self.pawn_attacks = np.concatenate([our_pawn_attacks, a0], axis=0)
 
+
+
     pawn_atk_tbl = [2**1, 2**0 + 2**2, 2**1 + 2**3, 2**2 + 2**4, 2**3 + 2**5, 2**4 + 2**6, 2**5 + 2**7, 2**6]
 
     for row in range(1,7) :
@@ -43,12 +45,11 @@ class IndexedPawnAttacks :
 
     self.pawn_attacks = [np.uint64(v) for v in self.pawn_attacks] #convert entries to np.uint64
 
+
   def __getitem__(self, idx):
     assert idx >= 0 and idx < 64
 
     return self.pawn_attacks[idx]
-
-
 
 class IndexedKnightAttacks :
   def __init__(self):

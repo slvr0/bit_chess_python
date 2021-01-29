@@ -37,7 +37,7 @@ class Castling :
     if chessmove.to == 63 :
       self.set_enemy_00(False)
     if  chessmove.to == 56 :
-      self.set_we_000(False)
+      self.set_enemy_000(False)
 
   def as_serialized(self):
     return self.castle_info_serialized

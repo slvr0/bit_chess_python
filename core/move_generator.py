@@ -320,7 +320,6 @@ class MoveGenerator :
           if (b_csq_000_64 | _idx_64[6]) & occ == 0 and b_csq_000_64 & attack_mask == 0: legal_movelist.add_move(
             ChessMove(3, 5, 'K', 'O-O-O'))
 
-
     return legal_movelist
 
   def append_pseudomove_general(self, cb, square, movelist, ptype=''):

@@ -47,13 +47,50 @@ import threading
 
 import numpy as np
 from nn.data_parser import NN_DataParser
+from nn.file_reader import extract_batches
 
+from nn.auto_batch_collect import _batch_collect_on_thread
+from nn.actor_critic_network import ActorCriticNetwork
+from nn.shared_optim import GlobalAdam
+import torch as T
+import torch.multiprocessing as torch_mp
+from nn.network_eval import test
 if __name__ == '__main__':
     move_gen = MoveGenerator()
+    #nn_dp = NN_DataParser()
+
+    #print(move_gen.pawn_attacks.pawn_attacks_rev)
+    #extract_batches("/home/dan/build-bitchess_2-Desktop-Debug/training_data/thread_0_data.txt")
+
     nn_dp = NN_DataParser()
 
-    _run_tests(nn_dp, move_gen)
-    #run_mcts_test(move_gen)
+    input_dims = (13, 64)
+    output_dims = nn_dp.output_dims
+
+    global_net = ActorCriticNetwork(input_dim=input_dims, output_dim=output_dims, network_name='ac_global')
+
+    optimizer = GlobalAdam(global_net.parameters(), lr=1e-4)
+    sleep_time = 10
+    clip_grad = .1
+    n_threads = 5
+
+
+    mp = torch_mp.get_context("spawn")
+
+    processes = []
+
+    # for index in range(n_threads) :
+    #     process = mp.Process(target=_batch_collect_on_thread,
+    #                          args=(index, global_net, "/home/dan/build-bitchess_2-Desktop-Debug/training_data", optimizer, sleep_time, clip_grad))
+    #
+    #     process.start()
+    #     processes.append(process)
+    #
+    # for process in processes :
+    #     process.join()
+
+    test(move_gen)
+
 
 
 
