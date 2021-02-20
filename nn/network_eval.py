@@ -14,7 +14,6 @@ def test(move_gen):
   T.manual_seed(123)
 
   parser = NN_DataParser()
-
   input_dims = (13*64)
   output_dims =  parser.output_dims
 
@@ -35,10 +34,6 @@ def test(move_gen):
         "rnbqkbnr/pppp1ppp/8/4P3/8/8/PPP1PPPP/RNBQKBNR b KQkq - 0 2",# //englund gambit
         "r1bqk2r/ppp2ppp/2p2n2/2b5/4P3/2N5/PPPP1PPP/R1BQKB1R w KQkq - 2 6"#//stafford
   ]
-
-  parser = NN_DataParser()
-  action_dim = parser.output_dims
-
   for position in positions :
     cb = ChessBoard(position)
 
@@ -51,9 +46,13 @@ def test(move_gen):
 
     moves = move_gen.get_legal_moves(cb)
 
+    nn_move_dict_translate = dict()
+
     legal_idcs = []
-    for move in moves :
+    for midx, move in enumerate(moves) :
       nn_idx = parser.nn_move(move)
+
+      nn_move_dict_translate[nn_idx] = midx
       legal_idcs.append(nn_idx)
 
     for i in range(parser.output_dims):
@@ -63,5 +62,7 @@ def test(move_gen):
     policy = F.softmax(net_logits, dim=1)
     action = T.argmax(policy).item()
 
-    cb.print_console()
-    print("in this posiiiiiiition ... our bot played ", nn_action_space_list[action])
+    optim_move_idx = nn_move_dict_translate[action]
+    moves[optim_move_idx].print_move()
+
+    #cb.print_console()

@@ -7,6 +7,7 @@ from core.move_generator import MoveGenerator
 from copy import deepcopy, copy
 from collections import Counter
 
+
 #detach completely from chessboard
 class ChessEnvironment :
   def __init__(self, move_gen = MoveGenerator):
@@ -16,6 +17,8 @@ class ChessEnvironment :
 
     self.visited_states = []
     self.visited_counter = Counter()
+
+
 
   def get_state(self):
     return deepcopy(self.cb)
@@ -64,6 +67,7 @@ class ChessEnvironment :
       status = self.states[3]
       reward = 0.5
       terminal = True
+
 
     elif _3fold >= 3 :
       status = self.states[3]

@@ -45,23 +45,21 @@ import multiprocessing as mp
 
 import threading
 
+from core.utils import pseudo_normal_distribution
 import numpy as np
 from nn.data_parser import NN_DataParser
 from nn.file_reader import extract_batches
-
+from nn.file_reader import _read_and_train
 from nn.auto_batch_collect import _batch_collect_on_thread
 from nn.actor_critic_network import ActorCriticNetwork
 from nn.shared_optim import GlobalAdam
 import torch as T
 import torch.multiprocessing as torch_mp
 from nn.network_eval import test
-if __name__ == '__main__':
-    move_gen = MoveGenerator()
-    #nn_dp = NN_DataParser()
+from simul.chess_gui import init_gui_env
+from simul.non_gui_simul import NonGUISimulationEnvironment
 
-    #print(move_gen.pawn_attacks.pawn_attacks_rev)
-    #extract_batches("/home/dan/build-bitchess_2-Desktop-Debug/training_data/thread_0_data.txt")
-
+def start_training_environment() :
     nn_dp = NN_DataParser()
 
     input_dims = (13, 64)
@@ -74,22 +72,40 @@ if __name__ == '__main__':
     clip_grad = .1
     n_threads = 5
 
-
     mp = torch_mp.get_context("spawn")
 
     processes = []
 
-    # for index in range(n_threads) :
-    #     process = mp.Process(target=_batch_collect_on_thread,
-    #                          args=(index, global_net, "/home/dan/build-bitchess_2-Desktop-Debug/training_data", optimizer, sleep_time, clip_grad))
-    #
-    #     process.start()
-    #     processes.append(process)
-    #
-    # for process in processes :
-    #     process.join()
+    for index in range(n_threads):
+        process = mp.Process(target=_read_and_train,
+                             args=(
+                             n_threads, index, global_net, "/home/dan/build-bitchess_2-Desktop-Debug/training_data", optimizer,
+                             sleep_time, clip_grad))
 
-    test(move_gen)
+        process.start()
+        processes.append(process)
+
+    for process in processes:
+        process.join()
+
+def start_nongui_simulation(start_pos) :
+    non_gui_sim_env = NonGUISimulationEnvironment()
+
+    #start from this position outside
+    cb = ChessBoard(start_pos)
+
+    non_gui_sim_env.start_game(cb, 0)
+
+def start_tests() :
+    move_gen = MoveGenerator()
+    _run_tests(None, move_gen)
+
+
+if __name__ == '__main__':
+
+    start_nongui_simulation("rnbqk1nr/ppp2ppp/4p3/3p4/1b1PP3/2N5/PPP2PPP/R1BQKBNR w KQkq - 2 4")
+
+    #start_training_environment()
 
 
 

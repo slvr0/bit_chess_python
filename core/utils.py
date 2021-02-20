@@ -8,6 +8,18 @@ _np_one = np.uint64(1)
 _np_zero = np.uint64(0)
 _np_64 = np.uint64(64)
 
+#converts an entry of N floats
+
+def pseudo_normal_distribution(arr = [] , maximize = True) :
+  if maximize : target = np.max(arr)
+  else : target = np.min(arr)
+
+  dist_scale = 10.0
+  v_dist = lambda x : 1.0 / np.exp(dist_scale * abs(target - x))
+
+  return [v_dist(v) for v in arr]
+
+
 class BinaryHelper :
   def __init__(self):
     pass

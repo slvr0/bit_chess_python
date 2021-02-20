@@ -20,6 +20,10 @@ from time import time
 
 #batches = array(TrainingData)
 
+
+
+
+
 def _batch_collect_on_thread(thread_id, global_network, training_data_path, optimizer, sleep_time = 10,  clip_grad = 0.1) :
 
   nn_dp = NN_DataParser()
@@ -27,19 +31,22 @@ def _batch_collect_on_thread(thread_id, global_network, training_data_path, opti
   input_dims = (13,64)
   output_dims  = nn_dp.output_dims
 
-  ac_net = ActorCriticNetwork(input_dim=input_dims, output_dim=output_dims, network_name='ac_localnet_0')
+  ac_net = ActorCriticNetwork(input_dim=input_dims, output_dim=output_dims, network_name='ac_localnet_' + str(thread_id))
 
   ac_net.load_state_dict(global_network.state_dict())
 
-  data_path = os.path.join(training_data_path, "thread_{}_data.txt".format(thread_id))
+  data_path = os.path.join(training_data_path, "thread_{}_data_.txt".format(thread_id))
+
+  # if not os.path.isfile(data_path):
+  #   sleep(sleep_time)
+  # else:
+  #   print("thread[{}] initiated".format(thread_id))
+  #   sleep(sleep_time)
+  batches = extract_batches(data_path)
+
 
   while True :
-    if not os.path.isfile(data_path) :
-      sleep(sleep_time)
-    else :
-      print("thread[{}] initiated".format(thread_id))
-      sleep(sleep_time)
-      batches = extract_batches(data_path)
+
       # try :
       #   os.remove(data_path)
       # except:
@@ -47,7 +54,7 @@ def _batch_collect_on_thread(thread_id, global_network, training_data_path, opti
 
       start_time = time()
 
-      progress_bar_inc = int((len(batches)) / 100.0)
+      progress_bar_inc = int(len(batches) / 100.0)
       progress_bar = 0
 
       progress_bar_percent = 0

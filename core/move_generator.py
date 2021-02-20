@@ -13,8 +13,6 @@ import numpy as np
 
 from core.utils import _np_zero, _np_one , _np_64
 
-#so much bad code here , many functions and code snippets repeating
-
 class MoveGenerator :
   def __init__(self):
     self.sliding_attacktables = SlidingAttackTables()
@@ -220,7 +218,7 @@ class MoveGenerator :
       elif idx_64 & cb.enemy_bishops_:
         t1 = time()
         attacks = self.sliding_attacktables.query_bishop_attacks(square, occ)
-        attacks_noking = self.sliding_attacktables.query_bishop_attacks(square, occ & king)
+        attacks_noking = self.sliding_attacktables.query_bishop_attacks(square, occ & ~king)
         attack_mask |= attacks
         attack_mask_noking |= attacks_noking
         self.dt1 += time() - t1
@@ -228,7 +226,7 @@ class MoveGenerator :
       elif idx_64 & cb.enemy_rooks_:
         t1 = time()
         attacks = self.sliding_attacktables.query_rook_attacks(square, occ)
-        attacks_noking = self.sliding_attacktables.query_rook_attacks(square, occ & king)
+        attacks_noking = self.sliding_attacktables.query_rook_attacks(square, occ & ~king)
         attack_mask |= attacks
         attack_mask_noking |= attacks_noking
         self.dt1 += time() - t1
@@ -236,7 +234,7 @@ class MoveGenerator :
       elif idx_64 & cb.enemy_queens_:
         t1 = time()
         attacks = self.sliding_attacktables.query_rook_attacks(square, occ)  | self.sliding_attacktables.query_bishop_attacks(square, occ)
-        attacks_noking = self.sliding_attacktables.query_rook_attacks(square, occ & king) | self.sliding_attacktables.query_bishop_attacks(square, occ & king)
+        attacks_noking = self.sliding_attacktables.query_rook_attacks(square, occ & ~king) | self.sliding_attacktables.query_bishop_attacks(square, occ & ~king)
         attack_mask |= attacks
         attack_mask_noking |= attacks_noking
         self.dt1 += time() - t1
@@ -258,10 +256,15 @@ class MoveGenerator :
 
     #legal king moves
     king_moves &= ~our_pieces
+
+    king_moves &= ~push_mask
+
     king_moves &= ~attack_mask_noking
     king_moves &= ~enemy_king
     # finally remove movement to protected enemy pieces
     king_moves &= ~(attack_mask_noking & enemy_pieces)
+
+
 
     k_move_idcs = cb.get_pieces_idx_from_uint(king_moves)
 

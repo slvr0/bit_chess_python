@@ -129,7 +129,7 @@ class ChessBoard :
     return (x * np.uint64(0x0101010101010101)) >> np.uint64(56)
 
   def has_mating_mat(self):
-    if self.rooks_ or self.pawns_ or self.queens_ : return True
+    if self.rooks_|self.enemy_rooks_ or self.pawns_|self.enemy_pawns_ or self.queens_|self.enemy_queens_ : return True
 
     if self.count_ones(self.our_pieces_ | self.enemy_pieces_) < 4 :
       return False
