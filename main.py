@@ -67,7 +67,7 @@ def start_training_environment() :
 
     global_net = ActorCriticNetwork(input_dim=input_dims, output_dim=output_dims, network_name='ac_global')
 
-    optimizer = GlobalAdam(global_net.parameters(), lr=1e-4)
+    optimizer = GlobalAdam(global_net.parameters(), lr=1e-3)
     sleep_time = 10
     clip_grad = .1
     n_threads = 5
@@ -100,12 +100,50 @@ def start_tests() :
     move_gen = MoveGenerator()
     _run_tests(None, move_gen)
 
+import torch as T
+import torch.nn.functional as F
+import torch.nn as nn
+import os
+
+from torch import sigmoid, optim
+
+from nn.actor_critic_network import ActorCriticNetwork
 
 if __name__ == '__main__':
 
-    start_nongui_simulation("rnbqk1nr/ppp2ppp/4p3/3p4/1b1PP3/2N5/PPP2PPP/R1BQKBNR w KQkq - 2 4")
+    #start_nongui_simulation("rnbqk1nr/ppp2ppp/4p3/3p4/1b1PP3/2N5/PPP2PPP/R1BQKBNR w KQkq - 2 4")
 
-    #start_training_environment()
+    start_training_environment()
+
+    #input = T.randn(32, 1, 5, 5)
+    #input = T.randn(1, 1, 13, 64)
+    #
+    # ac_net = ActorCriticNetwork((13,64), 5000, "dong")
+    #
+    # input = np.zeros(shape=(1, 1, 13, 64))
+    # input = T.FloatTensor(input)
+    #
+    # conv1 = nn.Conv2d(1, 32, 3, stride=2, padding=1)
+    # conv2 = nn.Conv2d(32, 32, 3, stride=2, padding=1)
+    # conv3 = nn.Conv2d(32, 32, 3, stride=2, padding=1)
+    # conv4 = nn.Conv2d(32, 32, 3, stride=2, padding=1)
+
+    #input = conv1(input)
+
+    #ac_net(input)
+
+    # input = np.zeros(shape=(1,1,13,64))
+    # input = T.FloatTensor(input)
+    #
+    # m = nn.Sequential(
+    # nn.Conv2d(1, 32, 12, 1, 1),
+    # nn.Flatten()
+    # )
+    # output = m(input)
+    #
+    # print(output.size())
+
+
 
 
 

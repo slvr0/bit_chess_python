@@ -6,10 +6,16 @@ import os
 from time import sleep
 from core.utils import pseudo_normal_distribution
 
+from torch.nn import MSELoss
+import torch.nn.functional as F
+
 from nn.data_parser import NN_DataParser
 import torch as T
 import numpy as np
 from time import time
+
+from torch.utils.tensorboard import *
+
 
 from os import listdir
 from os.path import isfile, join
@@ -79,8 +85,12 @@ def extract_batches(filename):
 
     return batches
 
-import os
+
 def _read_and_train(num_threads, thread_id, global_network, training_data_path, optimizer, sleep_time = 10,  clip_grad = 0.1) :
+
+  if thread_id == 0 :
+    tensorboard = SummaryWriter('logs', flush_secs=10)
+
   eps_spread = 0.01
 
   nn_dp = NN_DataParser()
@@ -92,40 +102,43 @@ def _read_and_train(num_threads, thread_id, global_network, training_data_path, 
 
   ac_net.load_state_dict(global_network.state_dict())
 
-  filename = os.path.join(training_data_path, "thread_{}_data_.txt".format(thread_id))
-
-
   save_every = 1000
   entries = 0
-  training_loops = 1000
+  training_loops = 100000
 
+  iteration_idx  = 0
   for i in range(training_loops):
 
     print("working on training loop nr : {}".format(i))
 
-    #split directory training data based on thread id
+    onlyfiles = [f for id, f in enumerate(listdir(training_data_path)) if isfile(join(training_data_path, f))][
+                thread_id::num_threads]
 
-    onlyfiles = [f for id, f in enumerate(listdir(training_data_path)) if isfile(join(training_data_path, f))][thread_id::num_threads]
+    for file_idx, file in enumerate(onlyfiles) :
 
-    for file in onlyfiles :
+      ac_net.load_state_dict(global_network.state_dict())
+
       with open(os.path.join(training_data_path, file), mode="r", encoding="utf-8") as f :
+
         _ = f.readline()
         _ = f.readline()
 
         line_count = 0
 
+        board_tensor_ = np.zeros(shape=(1, 1, 13, 64))
+
         while True :
-          board_tensor_ = np.zeros(shape=(13, 64))
 
           line = f.readline()
           if not line : break
 
           for v in parse_line_str_to_array(line) :
-            board_tensor_[line_count, int(v)] = 1
+            board_tensor_[0,0,line_count, int(v)] = 1
 
           line_count += 1
 
           if line_count > 12 :
+
             line_count = 0
             logits = f.readline()
 
@@ -136,79 +149,102 @@ def _read_and_train(num_threads, thread_id, global_network, training_data_path, 
 
             logits_ = parse_line_str_to_array(logits)
 
-            is_white = board_tensor_[12,5]
+        is_white = board_tensor_[0,0,12,5]
 
-            if len(logits_) == 0 : continue
+        if len(logits_) == 0 : continue
 
-            if is_white == 1 : logits_ = pseudo_normal_distribution(logits_)
-            else : logits_ = pseudo_normal_distribution(logits_, False)
+        if is_white == 1 : logits_ = pseudo_normal_distribution(logits_)
+        else : logits_ = pseudo_normal_distribution(logits_, False)
 
-            m_v = np.max(logits_)
+        m_v = np.max(logits_)
 
-            if (m_v - np.mean(logits_)) < eps_spread : continue
+        if (m_v - np.mean(logits_)) < eps_spread : continue
 
-            logits_idc_ = parse_line_str_to_array(nn_idcs, as_int = True)
-            value = float(value)
+        logits_idc_ = parse_line_str_to_array(nn_idcs, as_int = True)
+        value = float(value)
 
-            # print(depth, visits)
-            # print(logits_)
-            #an entry has been read, train on it
-            batch = TrainingData(board_tensor_, logits_, logits_idc_, value)
+        batch = TrainingData(board_tensor_, logits_, logits_idc_, value)
 
-            board_vec = batch.board_tensor
+        board_vec = batch.board_tensor
 
-            branch_idcs = batch.logits_idcs
-            value = batch.value
+        value = batch.value
 
-            white_eval = board_vec[12, 5]
+        #correct value function for white/node position
+        #logits value are automaitically corrected in the pseudo distribution fucntion
+        white_eval = board_vec[0, 0, 12, 5]
+        if white_eval and value < 0:
+          value = 0
+        elif not white_eval:
+          if value > 0:
+            value = 0
+          else:
+            value = abs(value)
 
-            # correction since branch scores are minus for black nodes and we want in range 0 - 1 etc
-            if white_eval == 1:
-              branch_scores = [1.0 + score for score in batch.logits]
-            else:
-              branch_scores = [1.0 - score for score in batch.logits]
+        #board_vec = board_vec.flatten()
+        board_tensor = T.FloatTensor(board_vec)
 
-            if white_eval and value < 0 : value = 0
-            elif not white_eval :
-              if value > 0 : value = 0
-              else : value = abs(value)
+        simul_logits_full = np.zeros(shape=(output_dims))
 
-            scores_full = np.zeros(shape=output_dims)
+        # batch.logits = n values, net_logits = N (output dim) values
+        for idx, v in zip(batch.logits_idcs, batch.logits):
+          simul_logits_full[idx] = v
 
-            for idx, v in zip(branch_idcs, branch_scores):
-              scores_full[idx] = v
+        simul_logits_full = T.FloatTensor([simul_logits_full])
 
-            board_vec = board_vec.flatten()
-            board_tensor = T.FloatTensor([board_vec])
+        for i in range(1) :
 
-            net_logits, net_value = ac_net(board_tensor)
+          iteration_idx += 1
 
-            pred_logits = T.FloatTensor([scores_full])
+          net_logits, net_value = ac_net(board_tensor)
 
-            critic_loss = value - net_value
 
-            probability_ratio = net_logits.exp() / pred_logits.exp()
+          net_logits = F.softmax(net_logits, dim=0)
 
-            weight_prob_ratio_clipped = T.clamp(probability_ratio, 1 - clip_grad, 1 + clip_grad)
+          critic_loss = value - net_value
 
-            a_loss = T.mean(weight_prob_ratio_clipped[0])
-            c_loss = critic_loss[0].item()
+          criterion = MSELoss()
+          #a_loss = criterion(net_logits[0, :], simul_logits_full[0, :])
 
-            total_loss = a_loss + .5 * c_loss
+          #print(a_loss)
+          #probability_ratio = net_logits.exp() / simul_logits_full.exp()
 
-            optimizer.zero_grad()
-            total_loss.backward()
+          a_loss = criterion(net_logits[0], simul_logits_full[0]) * 100.0
 
-            for local_param, global_param in zip(ac_net.parameters(), global_network.parameters()):
-              if global_param.grad is not None:
-                break
-              global_param._grad = local_param.grad
+          #a_loss = T.clamp(a_loss, 1 - clip_grad, 1 + clip_grad)
 
-            optimizer.step()
-            entries += 1
+          #print(a_loss)
+          # weight_prob_ratio_clipped = T.clamp(probability_ratio, 1 - clip_grad, 1 + clip_grad)
+          #
+          # a_loss = T.mean(weight_prob_ratio_clipped[0])
+          #
+          # c_loss = critic_loss[0].item()
 
-            if(entries % save_every == 0) :
-              print("{} Entries processed on thread {} , saving net...".format(entries, thread_id))
+          #print(weight_prob_ratio_clipped)
+
+          total_loss = a_loss
+
+          # print(a_loss, total_loss)
+
+          optimizer.zero_grad()
+          total_loss.backward()
+
+          if thread_id == 0 :
+            #log on thread 0
+            tensorboard.add_scalar('total_loss', total_loss, iteration_idx)
+            #tensorboard.add_scalar('actor_loss', a_loss, iteration_idx)
+            #tensorboard.add_scalar('critic_loss', c_loss , iteration_idx)
+
+          for local_param, global_param in zip(ac_net.parameters(), global_network.parameters()):
+            if global_param.grad is not None:
+              break
+            global_param._grad = local_param.grad
+
+          optimizer.step()
+          entries += 1
+
+        if(entries % save_every == 0) :
+          print("{} Entries processed on thread {} , saving net...".format(entries, thread_id))
+          global_network.save_network()
 
   global_network.save_network()
 
