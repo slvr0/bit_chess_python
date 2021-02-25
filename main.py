@@ -48,7 +48,7 @@ import threading
 from core.utils import pseudo_normal_distribution
 import numpy as np
 from nn.data_parser import NN_DataParser
-from nn.file_reader import extract_batches
+
 from nn.file_reader import _read_and_train
 from nn.auto_batch_collect import _batch_collect_on_thread
 from nn.actor_critic_network import ActorCriticNetwork
@@ -70,7 +70,7 @@ def start_training_environment() :
     optimizer = GlobalAdam(global_net.parameters(), lr=1e-3)
     sleep_time = 10
     clip_grad = .1
-    n_threads = 5
+    n_threads = 1
 
     mp = torch_mp.get_context("spawn")
 
@@ -110,38 +110,13 @@ from torch import sigmoid, optim
 from nn.actor_critic_network import ActorCriticNetwork
 
 if __name__ == '__main__':
-
-    #start_nongui_simulation("rnbqk1nr/ppp2ppp/4p3/3p4/1b1PP3/2N5/PPP2PPP/R1BQKBNR w KQkq - 2 4")
-
     start_training_environment()
 
-    #input = T.randn(32, 1, 5, 5)
-    #input = T.randn(1, 1, 13, 64)
-    #
-    # ac_net = ActorCriticNetwork((13,64), 5000, "dong")
-    #
-    # input = np.zeros(shape=(1, 1, 13, 64))
-    # input = T.FloatTensor(input)
-    #
-    # conv1 = nn.Conv2d(1, 32, 3, stride=2, padding=1)
-    # conv2 = nn.Conv2d(32, 32, 3, stride=2, padding=1)
-    # conv3 = nn.Conv2d(32, 32, 3, stride=2, padding=1)
-    # conv4 = nn.Conv2d(32, 32, 3, stride=2, padding=1)
+    start_nongui_simulation("rnbqk1nr/ppp2ppp/4p3/3p4/1b1PP3/2N5/PPP2PPP/R1BQKBNR w KQkq - 2 4")
 
-    #input = conv1(input)
 
-    #ac_net(input)
 
-    # input = np.zeros(shape=(1,1,13,64))
-    # input = T.FloatTensor(input)
-    #
-    # m = nn.Sequential(
-    # nn.Conv2d(1, 32, 12, 1, 1),
-    # nn.Flatten()
-    # )
-    # output = m(input)
-    #
-    # print(output.size())
+
 
 
 

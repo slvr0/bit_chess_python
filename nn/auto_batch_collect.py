@@ -5,7 +5,7 @@ from nn.actor_critic_network import ActorCriticNetwork
 
 import os
 from time import sleep
-from nn.file_reader import extract_batches
+
 from nn.data_parser import NN_DataParser
 import torch as T
 import numpy as np
@@ -19,10 +19,6 @@ from time import time
 #     self.value = value (1)
 
 #batches = array(TrainingData)
-
-
-
-
 
 def _batch_collect_on_thread(thread_id, global_network, training_data_path, optimizer, sleep_time = 10,  clip_grad = 0.1) :
 

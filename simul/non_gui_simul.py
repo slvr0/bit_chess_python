@@ -7,6 +7,7 @@ import os
 from core.move_generator import MoveGenerator
 import numpy as np
 
+from nn.keras_net import KerasNet
 from nn import actor_critic_network
 from nn import data_parser
 from nn import nn_output_values
@@ -25,8 +26,11 @@ class NonGUISimulationEnvironment :
     input_dim = (13, 64)
     output_dim = self.nn_parser.output_dims
 
-    self.ac_net = actor_critic_network.ActorCriticNetwork(input_dim, output_dim, 'ac_global')
-    self.ac_net.load_network()
+    # self.ac_net = actor_critic_network.ActorCriticNetwork(input_dim, output_dim, 'ac_global')
+    # self.ac_net.load_network()
+
+    self.ac_net = KerasNet(13*64, output_dim,'net_0')
+    self.ac_net.load_model()
 
     self.game_folder_path = "simul/test_games"
 
@@ -62,21 +66,26 @@ class NonGUISimulationEnvironment :
   def bot_choose_move(self, actions):
     board_vec = self.nn_parser.nn_board(self.env.cb)
 
-    board_vec = board_vec.flatten()
-    board_tensor = T.FloatTensor([board_vec])
+    #board_vec = board_vec.flatten()
+    #board_tensor = T.FloatTensor(board_vec)
 
-    net_logits, net_value = self.ac_net(board_tensor)
+    #print(board_vec.flatten().shape)
+    net_logits = self.ac_net.predict(board_vec.flatten())
 
+
+    #opt_move = np.argmax(net_logits)
+    #print(np.argmax(net_logits))
     moves = self.move_gen.get_legal_moves(self.env.cb)
 
-    policy = F.normalize(net_logits, dim=1)[0]
+    #policy = F.normalize(net_logits, dim=1)[0]
+    #policy = F.softmax(net_logits, dim=0)
 
     #map policy probabilities to moves
     moves_prob = []
     for move in moves :
       nn_id = self.nn_parser.nn_move(move)
 
-      moves_prob.append(policy[nn_id].item())
+      moves_prob.append(net_logits[0, nn_id])
 
     optimal_move = np.argmax(moves_prob)
 
