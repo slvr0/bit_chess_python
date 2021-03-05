@@ -112,7 +112,7 @@ from nn.actor_critic_network import ActorCriticNetwork
 if __name__ == '__main__':
     start_training_environment()
 
-    start_nongui_simulation("rnbqk1nr/ppp2ppp/4p3/3p4/1b1PP3/2N5/PPP2PPP/R1BQKBNR w KQkq - 2 4")
+    #start_nongui_simulation("rnbqk1nr/ppp2ppp/4p3/3p4/1b1PP3/2N5/PPP2PPP/R1BQKBNR w KQkq - 2 4")
 
 
 

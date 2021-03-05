@@ -2,6 +2,7 @@
 import numpy as np
 from nn.actor_critic_network import ActorCriticNetwork
 
+import sys
 import os
 from time import sleep
 from core.utils import pseudo_normal_distribution
@@ -43,14 +44,14 @@ def parse_line_str_to_array(line, as_int = False):
     return [float(v) for v in vs if v != '\n' and v != '' and v != '&\n']
 
 class BatchCollector :
-  def __init__(self, root_folder, on_thread, num_threads):
-    self.root_folder = root_folder
+  def __init__(self, training_dir, on_thread, num_threads):
+    self.training_dir = training_dir
     self.on_thread = on_thread
     self.num_threads = num_threads
     self.batches = []
 
   def read_entry(self, filename):
-    with open(os.path.join(self.root_folder, filename), mode="r", encoding="utf-8") as f:
+    with open(os.path.join(self.training_dir, filename), mode="r", encoding="utf-8") as f:
 
       d = f.readline()
       v = f.readline()
@@ -93,6 +94,7 @@ class BatchCollector :
       return data
 
   def preprocess_batch(self, batch, eps_spread = 0.01):
+
     is_white = batch.board_tensor[12, 5]
 
     if len(batch.logits) == 0 : return batch, False
@@ -117,13 +119,17 @@ class BatchCollector :
       else:
         batch.value = abs(batch.value)
 
+    parser  = NN_DataParser()
+    parser.decode_training_batch(batch)
+    exit(1)
+
     return batch, True
 
   def collect_batches(self, preprocess = True):
     self.reset_collection()
 
     #f0 = file_1613775792907
-    onlyfiles = [f for id, f in enumerate(listdir(self.root_folder)) if isfile(join(self.root_folder, f))][
+    onlyfiles = [f for id, f in enumerate(listdir(self.training_dir)) if isfile(join(self.training_dir, f))][
                 self.on_thread::self.num_threads]
 
     for file_idx, file in enumerate(onlyfiles) :
@@ -154,49 +160,72 @@ class BatchCollector :
     self.batches = []
 
 def _read_and_train(num_threads, thread_id, global_network, training_data_path, optimizer, sleep_time = 10,  clip_grad = 0.1) :
+  while True :
+    try :
+      epochs = 10000
 
-  epochs = 10000
+      logger = SummaryWriter('logs')
 
-  logger = SummaryWriter('logs')
+      save_every = 100
 
-  save_every = 100
+      nn_dp = NN_DataParser()
 
-  nn_dp = NN_DataParser()
+      input_dims = 13*64
+      output_dims = nn_dp.output_dims
 
-  input_dims = 13*64
-  output_dims = nn_dp.output_dims
+      net = KerasNet(input_dims, output_dims, 'net_'+ str(thread_id))
 
-  net = KerasNet(input_dims, output_dims, 'net_'+ str(thread_id))
+      net.load_model()
 
-  net.load_model()
+      session_id = 1#np.random.randint(1000) #training data is split among 1000 session ids
 
-  batch_collector = BatchCollector(training_data_path, thread_id, num_threads)
+      training_dir = os.path.join(training_data_path, "sess_{}".format(session_id))
 
-  batch_collector.reset_collection()
+      batch_collector = BatchCollector(training_dir, thread_id, num_threads)
 
-  batch_collector.collect_batches(preprocess=True)
+      batch_collector.reset_collection()
 
-  inputs, outputs  = batch_collector.parse_for_training()
+      batch_collector.collect_batches(preprocess=True)
 
-  entries = len(inputs)
-  #split for training testing
+      inputs, outputs  = batch_collector.parse_for_training()
 
-  train_data = inputs[:int(entries*.6)]
-  train_output = outputs[:int(entries*.6)]
+      entries = len(inputs)
+      #split for training testing
 
-  test_data = inputs[int(entries*.6):]
-  test_output = outputs[int(entries*.6):]
+      train_data    = inputs[:int(entries*.6)]
+      train_output  = outputs[:int(entries*.6)]
 
-  for epoch in range(epochs) :
-    net.train_on_batch(train_data, train_output)
-    loss = net.test_on_batch(test_data, test_output)
+      test_data = inputs[int(entries*.6):]
+      test_output = outputs[int(entries*.6):]
 
-    logger.add_scalar('loss_{}'.format(thread_id) , loss, epoch)
+      if entries == 0 :
+        print("found no entries. randomizing new session")
+        continue
 
-    if(epoch % save_every == 0 ) :
-      #print("checkpoint reached, saving net")
+      print("Thread {} starting training, session id : {} , nr of entries : {} , test/training ratio is 60 %".format(
+        thread_id, session_id, len(inputs)))
+
+      for epoch in range(epochs) :
+        net.train_on_batch(train_data, train_output)
+        loss = net.test_on_batch(test_data, test_output)
+
+        logger.add_scalar('loss_{}'.format(thread_id) , loss, epoch)
+
+        if(epoch % save_every == 0 ) :
+          #print("checkpoint reached, saving net")
+          net.save_model()
+
+    except KeyboardInterrupt as e :
+      print(e , "shutting down program")
+      print("saving network... ")
       net.save_model()
+      print("done[x]")
 
+      print("clearing entries...")
+      batch_collector.reset_collection()
+      print("done[x]")
+
+      sys.exit(1)
 
 
 
