@@ -5,6 +5,10 @@ import numpy as np
 import os
 from tensorflow.keras.models import load_model,save_model
 
+from tensorflow import Graph
+import tensorflow as tf
+import keras
+
 class KerasNet :
   def __init__(self, input_dims, output_dims,net_name="default"):
     self.model = Sequential()
@@ -26,15 +30,31 @@ class KerasNet :
     save_model(self.model, self.fp)
 
   def predict(self, state):
-
     return self.model.predict(np.expand_dims(state, axis=0))
 
   def fit(self, input, output_correct, test_freq = 0, callback = []):
     self.model.fit(input, output_correct,validation_split = test_freq, callbacks=[callback])
 
-  def load_model(self, load_from = ""):
-    if os.path.isdir(self.fp) :
-      self.model = load_model(self.fp)
-      print("loaded model @ {}".format(self.fp))
+  def load_model(self, load_from = "", on_thread = False):
+
+    if on_thread :
+      graph = tf.compat.v1.get_default_graph()
+
+      with graph.as_default() :
+        if os.path.isdir(self.fp):
+          self.model = load_model(self.fp)
+          print("loaded model @ {}".format(self.fp))
+        else:
+          print("found no model to load (KerasNet")
+
+      return graph
+
     else :
-      print("found no model to load (KerasNet")
+      if os.path.isdir(self.fp):
+        self.model = load_model(self.fp)
+        print("loaded model @ {}".format(self.fp))
+      else:
+        print("found no model to load (KerasNet")
+
+
+

@@ -60,6 +60,7 @@ from simul.chess_gui import init_gui_env
 from simul.non_gui_simul import NonGUISimulationEnvironment
 
 def start_training_environment() :
+
     nn_dp = NN_DataParser()
 
     input_dims = (13, 64)
@@ -89,12 +90,27 @@ def start_training_environment() :
         process.join()
 
 def start_nongui_simulation(start_pos) :
-    non_gui_sim_env = NonGUISimulationEnvironment()
+
+    # from communication.mqtt_comm import Subscriber
+    # mqtt_sub = Subscriber("mqtt_test")
+
+    non_gui_sim_env = NonGUISimulationEnvironment(on_thread=True)
 
     #start from this position outside
     cb = ChessBoard(start_pos)
 
-    non_gui_sim_env.start_game(cb, 0)
+    processes = []
+
+    process = mp.Process(target= non_gui_sim_env.start_game,
+                         args=(cb, 0))
+
+    process.start()
+    processes.append(process)
+
+    for process in processes:
+        process.join()
+
+    #non_gui_sim_env.start_game(cb, 0)
 
 def start_tests() :
     move_gen = MoveGenerator()
@@ -109,10 +125,38 @@ from torch import sigmoid, optim
 
 from nn.actor_critic_network import ActorCriticNetwork
 
-if __name__ == '__main__':
-    start_training_environment()
+def test_mqtt_env() :
+    from communication.mqtt_comm import Subscriber
+    mqtt_sub = Subscriber("mqtt_test")
 
-    #start_nongui_simulation("rnbqk1nr/ppp2ppp/4p3/3p4/1b1PP3/2N5/PPP2PPP/R1BQKBNR w KQkq - 2 4")
+    #
+    # mqtt_sub.connect("localhost")
+    # mqtt_sub.subscribe("mqtt_test")
+    #
+    # mqtt_sub.loop_forever()
+
+
+    # import paho.mqtt.client as mqtt
+    # def on_connect(client, userdata, flags, rc):
+    #     print("Connected with result code " + str(rc))
+    # def on_message(client, userdata, msg):
+    #     print(msg.topic + " " + str(msg.payload))
+    # client = mqtt.Client()
+    # client.on_connect = on_connect
+    # client.on_message = on_message
+    # client.connect("localhost", 1883, 60)
+    # client.subscribe("mqtt_test")
+    # client.loop_forever()
+
+if __name__ == '__main__':
+
+    #test_mqtt_env()
+
+
+
+    #start_training_environment()
+
+    start_nongui_simulation("rnbqk1nr/ppp2ppp/4p3/3p4/1b1PP3/2N5/PPP2PPP/R1BQKBNR w KQkq - 2 4")
 
 
 

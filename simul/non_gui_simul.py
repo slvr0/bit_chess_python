@@ -16,8 +16,13 @@ from wrappers.chess_env import ChessEnvironment
 
 from core.utils import board_notations
 
+import tensorflow as tf
+
+
+
+
 class NonGUISimulationEnvironment :
-  def __init__(self):
+  def __init__(self, on_thread = False):
     self.move_gen = MoveGenerator()
     self.env = ChessEnvironment(self.move_gen)
 
@@ -26,11 +31,19 @@ class NonGUISimulationEnvironment :
     input_dim = (13, 64)
     output_dim = self.nn_parser.output_dims
 
+    self.on_thread = on_thread
     # self.ac_net = actor_critic_network.ActorCriticNetwork(input_dim, output_dim, 'ac_global')
     # self.ac_net.load_network()
 
-    self.ac_net = KerasNet(13*64, output_dim,'net_0')
-    self.ac_net.load_model()
+    self.ac_net = KerasNet(13 * 64, output_dim, 'net_0')
+
+    if on_thread :
+      self.graph = self.ac_net.load_model(on_thread=True)
+    else :
+      self.ac_net.load_model()
+
+      self.sess = None
+      self.graph = None
 
     self.game_folder_path = "simul/test_games"
 
@@ -50,7 +63,6 @@ class NonGUISimulationEnvironment :
         #actions.print()
         if terminal :  break
 
-
         #ask bot what he wants to play
         bot_choose = self.bot_choose_move(actions)
 
@@ -64,18 +76,31 @@ class NonGUISimulationEnvironment :
     white_toact = self.env.cb.white_to_act
 
   def bot_choose_move(self, actions):
+
     board_vec = self.nn_parser.nn_board(self.env.cb)
+
 
     #board_vec = board_vec.flatten()
     #board_tensor = T.FloatTensor(board_vec)
 
     #print(board_vec.flatten().shape)
-    net_logits = self.ac_net.predict(board_vec.flatten())
+    if self.on_thread :
+      with self.graph.as_default():
+        net_logits = self.ac_net.predict(board_vec.flatten())
+
+    else :
+      net_logits = self.ac_net.predict(board_vec.flatten())
+
+
+    print("making move")
+
 
 
     #opt_move = np.argmax(net_logits)
     #print(np.argmax(net_logits))
     moves = self.move_gen.get_legal_moves(self.env.cb)
+
+
 
     #policy = F.normalize(net_logits, dim=1)[0]
     #policy = F.softmax(net_logits, dim=0)
@@ -83,11 +108,13 @@ class NonGUISimulationEnvironment :
     #map policy probabilities to moves
     moves_prob = []
     for move in moves :
+
       nn_id = self.nn_parser.nn_move(move)
 
       moves_prob.append(net_logits[0, nn_id])
 
     optimal_move = np.argmax(moves_prob)
+
 
     return optimal_move
 
