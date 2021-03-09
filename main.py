@@ -30,6 +30,9 @@ from test.random_chessplay_test import run_test
 from test.move_generator_test import run_move_generator_test
 from core.move_generator import MoveGenerator
 
+from mcts.cached_mcts_positions import CachedMCTSPositions
+from nn.NNMCTSPipe import NNMCTSPipe
+
 from time import time
 import numpy as np
 import ctypes
@@ -58,6 +61,9 @@ import torch.multiprocessing as torch_mp
 from nn.network_eval import test
 from simul.chess_gui import init_gui_env
 from simul.non_gui_simul import NonGUISimulationEnvironment
+
+from communication.nn_mqtt_requester import NN_MQTT_Requester, nn_mqtt_req_on_thread
+import threading
 
 def start_training_environment() :
 
@@ -90,19 +96,30 @@ def start_training_environment() :
         process.join()
 
 def start_nongui_simulation(start_pos) :
+    from communication.mqtt_comm import Subscriber
+    from communication.nn_mqtt_requester import NN_MQTT_Requester
+    from mcts.cached_mcts_positions import CachedMCTSPositions
 
-    # from communication.mqtt_comm import Subscriber
-    # mqtt_sub = Subscriber("mqtt_test")
+    cached_positions = CachedMCTSPositions()
 
-    non_gui_sim_env = NonGUISimulationEnvironment(on_thread=True)
+    move_gen = MoveGenerator()
+
+    #non_gui_sim_env = NonGUISimulationEnvironment(on_thread=True)
 
     #start from this position outside
     cb = ChessBoard(start_pos)
 
+    mp = torch_mp.get_context("spawn")
+
     processes = []
 
-    process = mp.Process(target= non_gui_sim_env.start_game,
-                         args=(cb, 0))
+    process = mp.Process(target=nn_mqtt_req_on_thread, args=('mcts_nn_que', 'mcts_cache_position', move_gen))
+
+    process.start()
+    processes.append(process)
+
+    process = mp.Process(target= NonGUISimulationEnvironment.start_game,
+                         args=(cb, move_gen, cached_positions,  0, True))
 
     process.start()
     processes.append(process)
@@ -129,12 +146,13 @@ def test_mqtt_env() :
     from communication.mqtt_comm import Subscriber
     mqtt_sub = Subscriber("mqtt_test")
 
+
+
     #
     # mqtt_sub.connect("localhost")
     # mqtt_sub.subscribe("mqtt_test")
     #
     # mqtt_sub.loop_forever()
-
 
     # import paho.mqtt.client as mqtt
     # def on_connect(client, userdata, flags, rc):
@@ -152,11 +170,57 @@ if __name__ == '__main__':
 
     #test_mqtt_env()
 
-
-
     #start_training_environment()
 
     start_nongui_simulation("rnbqk1nr/ppp2ppp/4p3/3p4/1b1PP3/2N5/PPP2PPP/R1BQKBNR w KQkq - 2 4")
+
+    #self.client.publish('mcts_cache_position', msg.payload)
+
+
+    # msg = "2rq2k1/pprbbpp1/4pn1p/3pN3/3B4/1N2P3/P1n1BPPP/RQ3RK1 w - - 10 20"
+    # #add net eval of position
+    #
+    # move_gen = MoveGenerator()
+    # nn_parser = NN_DataParser()
+    #
+    # from nn.keras_net import KerasNet
+    #
+    # input_dim = (13, 64)
+    # output_dim = nn_parser.output_dims
+    #
+    # ac_net = KerasNet(13 * 64, output_dim, 'net_0')
+    # graph = ac_net.load_model(on_thread=False)
+    #
+    # cb = ChessBoard(msg)
+    #
+    # actions = move_gen.get_legal_moves(cb)
+    #
+    # nn_idcs = [nn_parser.nn_move(m) for m in actions]
+    #
+    # tensor_data = nn_parser.nn_board(cb)
+    #
+    # net_logs = ac_net.predict(tensor_data.flatten())
+    #
+    # net_logs = [v for i,v in enumerate(net_logs[0]) if i in nn_idcs]
+    #
+    # msg += " {"
+    # for idx, log in zip(nn_idcs, net_logs) :
+    #
+    #     msg += "{0}:{1:1f}:".format(int(idx),log)
+    # msg = msg[:-1] + "}"
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

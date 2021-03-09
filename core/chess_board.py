@@ -28,9 +28,45 @@ from time import time
 from core.chess_square import Square
 from copy import deepcopy
 
+
 ptypelist = {'P':0,'N':1,'B':2,'R':3,'Q':4,'K':5,'p':6,'n':7,'b':8,'r':9,'q':10,'k':11}
+# ptypelist_by_dcs = {key : val for key, val in zip(ptypelist.values(), ptypelist.keys())}
+ptypelist_by_idcs = [k for k in ptypelist.keys()]
 
 class ChessBoard :
+  def __init__(self, fen_position=""):
+    _np_zero = np.uint64(0x0)
+
+    self.pawns_ = _np_zero
+    self.bishops_ = _np_zero
+    self.knights_ = _np_zero
+    self.rooks_ = _np_zero
+    self.queens_ = _np_zero
+    self.king_ = _np_zero
+
+    self.enemy_pawns_ = _np_zero
+    self.enemy_bishops_ = _np_zero
+    self.enemy_knights_ = _np_zero
+    self.enemy_rooks_ = _np_zero
+    self.enemy_queens_ = _np_zero
+    self.enemy_king_ = _np_zero
+
+    # try this out, scrap the godamn dictionary
+    self.our_pieces_ = np.uint64(self.pawns_ | self.knights_ | self.bishops_ | self.rooks_ | self.queens_ | self.king_)
+    self.enemy_pieces_ = np.uint64(
+      self.enemy_pawns_ | self.enemy_knights_ | self.enemy_bishops_ | self.enemy_rooks_ | self.enemy_queens_ | self.enemy_king_)
+    self.occ = np.uint64(self.our_pieces_ | self.enemy_pieces_)
+
+    self.white_to_act = True
+
+    self.enpassant_sq = -1
+    self.move_count = 0
+    self._50_rulecount = 0
+
+    self.castling = Castling()
+    self.fen = fen_position
+
+    if fen_position != "": self.read_from_fen(fen_position=fen_position)
 
   #calling reset from doesn't reposition from fen string rather from the input chessboard pieces, which is much faster
   def reset_from(self, cb):
@@ -233,38 +269,7 @@ class ChessBoard :
 
     return ncb
 
-  def __init__(self, fen_position = "") :
-    _np_zero = np.uint64(0x0)
 
-    self.pawns_ = _np_zero
-    self.bishops_= _np_zero
-    self.knights_= _np_zero
-    self.rooks_= _np_zero
-    self.queens_= _np_zero
-    self.king_= _np_zero
-
-    self.enemy_pawns_= _np_zero
-    self.enemy_bishops_= _np_zero
-    self.enemy_knights_= _np_zero
-    self.enemy_rooks_= _np_zero
-    self.enemy_queens_= _np_zero
-    self.enemy_king_= _np_zero
-
-    #try this out, scrap the godamn dictionary
-    self.our_pieces_ = np.uint64(self.pawns_ | self.knights_ | self.bishops_ | self.rooks_ | self.queens_ | self.king_)
-    self.enemy_pieces_ = np.uint64(self.enemy_pawns_ | self.enemy_knights_ | self.enemy_bishops_ | self.enemy_rooks_ | self.enemy_queens_ | self.enemy_king_)
-    self.occ = np.uint64(self.our_pieces_ | self.enemy_pieces_)
-
-    self.white_to_act = True
-
-    self.enpassant_sq = -1
-    self.move_count = 0
-    self._50_rulecount = 0
-
-    self.castling = Castling()
-    self.fen = fen_position
-    
-    if fen_position != "" : self.read_from_fen(fen_position=fen_position)
 
   def mirror_side(self):
 
@@ -375,6 +380,11 @@ class ChessBoard :
     self.our_pieces_ = self.pawns_ | self.knights_ | self.bishops_ | self.rooks_ | self.queens_ | self.king_
     self.enemy_pieces_ = self.enemy_pawns_ | self.enemy_knights_ | self.enemy_bishops_ | self.enemy_rooks_ | self.enemy_queens_ | self.enemy_king_
     self.occ = self.our_pieces_ | self.enemy_pieces_
+
+    if not self.white_to_act :
+      self.mirror_side()
+
+    self.set_zobrist()
 
   def reset_board(self) :
     for key in self.pieces : self.pieces[key] = _np_zero
@@ -593,11 +603,54 @@ class ChessBoard :
 
 
   def get_fen(self):
-    #this should read the pieces and not just return the string
-    return self.fen
-  
-  
-  
+
+    voids_count = 0
+    fen = ""
+
+    for r in reversed(range(8)):
+      for c in range(8) :
+
+        idx = r * 8 + c
+        idx = idx if self.white_to_act else 63 - idx
+
+        space_occ = self.occ_by(r*8+c)
+        if space_occ == -1 :
+          voids_count += 1
+        else :
+          if voids_count != 0 :
+            fen += str(voids_count)
+
+          if not self.white_to_act :
+            if str(space_occ).isupper() : space_occ = str(space_occ).lower()
+            else : space_occ = str(space_occ).upper()
+
+          fen += ptypelist_by_idcs[space_occ]
+          voids_count = 0
+
+      if voids_count != 0 :
+        fen += str(voids_count)
+      voids_count = 0
+      if r >= 1 : fen += '/'
+
+    fen += " "
+
+    caste_string = self.castling.as_string()
+
+    if not self.white_to_act :
+      tmp = caste_string[0:2]
+      tmp1 = caste_string[2:4]
+      caste_string = tmp1.upper() + tmp.lower()
+
+    fen += caste_string
+
+    if self.enpassant_sq == -1 :  fen += " -"
+    else : fen += " " + board_notations[self.enpassant_sq].lower()
+
+    fen += " " + str(self._50_rulecount)
+
+    fen += " " + str(self.move_count)
+
+    return fen
   
 
 

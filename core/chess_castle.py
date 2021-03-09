@@ -39,6 +39,21 @@ class Castling :
     if  chessmove.to == 56 :
       self.set_enemy_000(False)
 
+  def as_string(self):
+    we_00 = self.we_00()
+    we_000 = self.we_000()
+    enemy_00 = self.enemy_00()
+    enemy_000 = self.enemy_000()
+
+    if not (we_00 | we_000 |  enemy_00 | enemy_000) : return "-"
+
+    K = 'K' if we_00 else ''
+    Q = 'Q' if we_000 else ''
+    k = 'k' if enemy_00 else ''
+    q = 'q' if enemy_000 else ''
+
+    return K + Q + k + q
+
   def as_serialized(self):
     return self.castle_info_serialized
 

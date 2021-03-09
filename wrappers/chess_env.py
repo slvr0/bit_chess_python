@@ -18,8 +18,6 @@ class ChessEnvironment :
     self.visited_states = []
     self.visited_counter = Counter()
 
-
-
   def get_state(self):
     return deepcopy(self.cb)
 
@@ -44,9 +42,6 @@ class ChessEnvironment :
       _3fold = most_visited_state[0][1]
     else :
       _3fold = 0
-
-    if _3fold == 3 :
-      print("three fold reset!")
 
     status = self.states[0]
     reward = 0

@@ -98,7 +98,6 @@ class NN_DataParser :
 
       return nn_action_space[key]
 
-  #returns vectors of size 13x64, make use of scipy????
   def nn_board(self, cb):
     #dim 0, idx 0-11 = pieces . idx 12 = boardstate , wc00, wc000, bc00, bc000, white_turn ,enp_flag
     return cb.as_nn_tensor()

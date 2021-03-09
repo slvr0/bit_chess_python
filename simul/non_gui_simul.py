@@ -16,10 +16,9 @@ from wrappers.chess_env import ChessEnvironment
 
 from core.utils import board_notations
 
+from nn.NNMCTSPipe import NNMCTSPipe
+
 import tensorflow as tf
-
-
-
 
 class NonGUISimulationEnvironment :
   def __init__(self, on_thread = False):
@@ -47,78 +46,98 @@ class NonGUISimulationEnvironment :
 
     self.game_folder_path = "simul/test_games"
 
-  def start_game(self, cb, game_id):
-    fp = os.path.join(self.game_folder_path, str(game_id) + ".txt")
+  @staticmethod
+  def start_game(cb, move_gen, cached_positions, game_id, on_thread = False):
 
-    self.env.reset(cb)
+    env = ChessEnvironment(move_gen)
 
-    with open(fp, '+w') as file :
-      while True:
-        #check valid moves, take action from
-        actions = self.env.get_legal_moves()
-        status, reward, to_act, terminal, repeats = self.env.get_board_info(actions)
+    nn_mcts_pipe = NNMCTSPipe(cached_positions)
 
-        #self.env.cb.print_console()
+    nn_parser = data_parser.NN_DataParser()
 
-        #actions.print()
-        if terminal :  break
+    input_dim = (13, 64)
+    output_dim = nn_parser.output_dims
 
-        #ask bot what he wants to play
-        bot_choose = self.bot_choose_move(actions)
+    on_thread = on_thread
+    # self.ac_net = actor_critic_network.ActorCriticNetwork(input_dim, output_dim, 'ac_global')
+    # self.ac_net.load_network()
 
-        #record it
-        self.record_move(file, to_act, actions, bot_choose)
+    ac_net = KerasNet(13 * 64, output_dim, 'net_0')
 
-        #update the gamestate
-        self.env.step(actions, bot_choose)
+    if on_thread:
+      graph = ac_net.load_model(on_thread=True)
+    else:
+      ac_net.load_model()
+      graph = None
 
-  def pgn_convert(self, move):
+    game_folder_path = "simul/test_games"
+
+    fp = os.path.join(game_folder_path, str(game_id) + ".txt")
+
+    n_games = 1000
+
+    def make_move(env, nn_mcts_pipe, mcts_support = False) :
+      actions = env.get_legal_moves()
+      status, reward, to_act, terminal, repeats = env.get_board_info(actions)
+
+      if terminal:  return status, reward, terminal
+
+      if mcts_support :
+        bot_choose = nn_mcts_pipe.log_and_return_mcts_response(env.cb, ac_net, nn_parser, graph)
+      else :
+        bot_choose = NonGUISimulationEnvironment.bot_choose_move(actions, ac_net, env, nn_parser, graph)
+
+      #record it
+      NonGUISimulationEnvironment.record_move(file, to_act, actions, bot_choose)
+
+      #update the gamestate
+      env.step(actions, bot_choose)
+
+      return status, reward, terminal
+
+    env.reset(cb)
+
+    mcts_bot_color = env.cb.white_to_act
+
+    for game in range(n_games) :
+      env.reset(cb)
+
+      with open(fp, '+w') as file :
+        while True:
+          status, reward, terminal = make_move(env, nn_mcts_pipe, mcts_support=True)
+          if terminal : break
+
+          status, reward, terminal = make_move(env, nn_mcts_pipe, mcts_support=False)
+          if terminal: break
+
+  @staticmethod
+  def pgn_convert(self, move, env):
     white_toact = self.env.cb.white_to_act
 
-  def bot_choose_move(self, actions):
+  @staticmethod
+  def bot_choose_move(actions, net, env, nn_parser, graph = None):
 
-    board_vec = self.nn_parser.nn_board(self.env.cb)
+    board_vec = nn_parser.nn_board(env.cb)
 
+    if graph is None :
+      net_logits = net.predict(board_vec.flatten())
+    else:
+      with graph.as_default():
+        net_logits = net.predict(board_vec.flatten())
 
-    #board_vec = board_vec.flatten()
-    #board_tensor = T.FloatTensor(board_vec)
-
-    #print(board_vec.flatten().shape)
-    if self.on_thread :
-      with self.graph.as_default():
-        net_logits = self.ac_net.predict(board_vec.flatten())
-
-    else :
-      net_logits = self.ac_net.predict(board_vec.flatten())
-
-
-    print("making move")
-
-
-
-    #opt_move = np.argmax(net_logits)
-    #print(np.argmax(net_logits))
-    moves = self.move_gen.get_legal_moves(self.env.cb)
-
-
-
-    #policy = F.normalize(net_logits, dim=1)[0]
-    #policy = F.softmax(net_logits, dim=0)
-
-    #map policy probabilities to moves
     moves_prob = []
-    for move in moves :
+    for action in actions :
 
-      nn_id = self.nn_parser.nn_move(move)
+      nn_id = nn_parser.nn_move(action)
 
       moves_prob.append(net_logits[0, nn_id])
 
     optimal_move = np.argmax(moves_prob)
 
-
     return optimal_move
 
-  def record_move(self, file, to_act, actions, bot_choose):
+  @staticmethod
+  def record_move(file, to_act, actions, bot_choose):
     if not to_act:
       bn = board_notations[::-1]
     else:

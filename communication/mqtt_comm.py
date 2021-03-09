@@ -39,13 +39,38 @@ class Subscriber() :
 
     self.client.subscribe(self.topic)
 
-    self.client.loop_forever()
+    #self.client.loop_forever()
 
-  def on_conn(self, client, userdata, flags, rc):
+  @staticmethod
+  def on_conn(client, userdata, flags, rc):
     print("Connected with result code " + str(rc))
 
-  def on_message(self, client, userdata, msg):
+  @staticmethod
+  def on_message(client, userdata, msg):
     print(msg.topic + " " + str(msg.payload))
+
+  @staticmethod
+  def extend_message_pipe(msg):
+    print("extending message... ")
+
+  @staticmethod
+  def init_on_thread(topic, host_name = MQTT_BROKER_HOST, host_port = MQTT_BROKER_PORT) :
+
+    client = mqtt.Client()
+
+    topic = topic
+
+    host_name = host_name
+    host_port = host_port
+
+    client.on_message = Subscriber.on_message
+
+    client.connect(host_name, host_port, 60)
+
+    client.subscribe(topic)
+
+    client.loop_forever()
+
 
 
 
